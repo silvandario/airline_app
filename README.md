@@ -26,7 +26,7 @@ cd airline_app
 
 ### 2. Create Virtual Environment
 ```bash
-python3.10 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
