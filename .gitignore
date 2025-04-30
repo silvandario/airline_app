@@ -1,0 +1,19 @@
+# Virtuelle Umgebung
+.venv/
+__pycache__/
+*.pyc
+
+# Modelldateien (falls du nicht LFS verwendest)
+*.pkl
+
+# CSVs / Daten
+*.csv
+*.parquet
+
+# Streamlit & Jupyter
+.streamlit/
+.ipynb_checkpoints/
+
+# Sonstige IDE-Dateien
+.DS_Store
+.vscode/
