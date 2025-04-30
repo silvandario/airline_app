@@ -52,7 +52,11 @@ with tab1:
     filter_class = st.selectbox("Filter nach Klasse", ["Alle", "Economy", "Economy Plus", "Business"])
     filter_type = st.selectbox("Filter nach Reisetyp", ["Alle", "Geschäftlich", "Privat"])
     
-    sample_df = pd.read_csv("sample_data/sample_clean.csv")  # Beispiel-Dataset
+    try:
+        sample_df = pd.read_csv("sample_data/sample_clean.csv")
+    except FileNotFoundError:
+        st.warning("⚠️ Beispiel-Datensatz nicht gefunden. Bitte lade eine CSV-Datei hoch.")
+        sample_df = pd.DataFrame(columns=feature_order)
 
     if filter_class != "Alle":
         if filter_class == "Economy":
@@ -91,20 +95,20 @@ with tab3:
         values = {}
         values['Age'] = st.slider("Alter", 18, 80, 35)
         values['Flight Distance'] = st.slider("Flugdistanz", 100, 5000, 1000)
-        values['Departure and Arrival Time Convenience'] = st.slider("Time Convenience", 1, 5, 3)
-        values['Ease of Online Booking'] = st.slider("Online Booking", 1, 5, 3)
-        values['Check-in Service'] = st.slider("Check-in", 1, 5, 3)
-        values['Online Boarding'] = st.slider("Boarding", 1, 5, 3)
-        values['Gate Location'] = st.slider("Gate Location", 1, 5, 3)
-        values['On-board Service'] = st.slider("On-board Service", 1, 5, 3)
-        values['Seat Comfort'] = st.slider("Seat Comfort", 1, 5, 3)
-        values['Leg Room Service'] = st.slider("Leg Room", 1, 5, 3)
-        values['Cleanliness'] = st.slider("Cleanliness", 1, 5, 3)
-        values['Food and Drink'] = st.slider("Food and Drink", 1, 5, 3)
-        values['In-flight Service'] = st.slider("In-flight Service", 1, 5, 3)
+        values['Departure and Arrival Time Convenience'] = st.slider("Time Convenience", 1, 5, 4)
+        values['Ease of Online Booking'] = st.slider("Online Booking", 1, 5, 4)
+        values['Check-in Service'] = st.slider("Check-in", 1, 5, 4)
+        values['Online Boarding'] = st.slider("Boarding", 1, 5, 4)
+        values['Gate Location'] = st.slider("Gate Location", 1, 5, 4)
+        values['On-board Service'] = st.slider("On-board Service", 1, 5, 4)
+        values['Seat Comfort'] = st.slider("Seat Comfort", 1, 5, 4)
+        values['Leg Room Service'] = st.slider("Leg Room", 1, 5, 4)
+        values['Cleanliness'] = st.slider("Cleanliness", 1, 5, 4)
+        values['Food and Drink'] = st.slider("Food and Drink", 1, 5, 4)
+        values['In-flight Service'] = st.slider("In-flight Service", 1, 5, 4)
         values['In-flight Wifi Service'] = st.slider("Wifi", 1, 5, 3)
-        values['In-flight Entertainment'] = st.slider("Entertainment", 1, 5, 3)
-        values['Baggage Handling'] = st.slider("Baggage", 1, 5, 3)
+        values['In-flight Entertainment'] = st.slider("Entertainment", 1, 5, 4)
+        values['Baggage Handling'] = st.slider("Baggage", 1, 5, 4)
 
         values['Gender_Male'] = 1 if st.selectbox("Geschlecht", ["Männlich", "Weiblich"]) == "Männlich" else 0
         values['Customer Type_Returning'] = 1 if st.selectbox("Kundentyp", ["Neu", "Wiederkehrend"]) == "Wiederkehrend" else 0
