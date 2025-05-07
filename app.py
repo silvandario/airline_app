@@ -5,6 +5,8 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+## -- TODO -> Neue Modelle Laden -- ##
+
 # Lade Modelle und Scaler
 xgb_model = joblib.load("models/xgb_best_model.pkl")
 rf_model = joblib.load("models/rf_best_model.pkl")
