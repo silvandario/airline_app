@@ -5,12 +5,11 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-## -- TODO -> Neue Modelle Laden -- ##
 
 # Lade Modelle und Scaler
-xgb_model = joblib.load("models/xgb_best_model.pkl")
-rf_model = joblib.load("models/rf_best_model.pkl")
-scaler = joblib.load("models/scaler.pkl")
+xgb_model = joblib.load("models/xgb_best_model-2.pkl")
+rf_model = joblib.load("models/rf_best_model-2.pkl")
+scaler = joblib.load("models/scaler-2.pkl")
 
 # Feature-Reihenfolge (ohne Zielvariable)
 feature_order = [
