@@ -131,3 +131,82 @@ with tab3:
     st.markdown("### 🔍 Modellvorhersagen:")
     st.write(f"**XGBoost:** {'Zufrieden 😊' if pred_xgb == 1 else 'Unzufrieden 😠'}")
     st.write(f"**Random Forest:** {'Zufrieden 😊' if pred_rf == 1 else 'Unzufrieden 😠'}")
+    
+    
+    
+    def render_rocket_probability(prob, model_name):
+        """
+        Visualisiert die Zufriedenheitswahrscheinlichkeit mit einer aufsteigenden Rakete.
+        """
+        height = int(prob * 100)
+        stratosphere_level = 70
+        space_level = 90
+
+        if height >= space_level:
+            bg_color = "#000033"
+            atmosphere_text = "🌌 WELTRAUM"
+        elif height >= stratosphere_level:
+            bg_color = "#0066cc"
+            atmosphere_text = "🌤️ STRATOSPHÄRE"
+        else:
+            bg_color = "#87CEEB"
+            atmosphere_text = "☁️ TROPOSPHÄRE"
+
+        # Rakete-Flamme-Logik
+        rocket = "🚀"
+        flame = "🔥" if height < space_level else ""
+
+        # HTML-Block separat als kompletter Markdown
+        rocket_html = f"""
+            <div style="background-color: {bg_color}; padding: 10px; border-radius: 10px; 
+                        color: white; text-align: center; min-height: 220px; position: relative;">
+                <h3 style="margin-bottom: 5px;">{model_name}: {prob:.2%}</h3>
+                <div style="position: absolute; top: 10px; right: 10px; font-size: 16px; 
+                            background-color: rgba(255,255,255,0.2); padding: 5px; border-radius: 5px;">
+                    {atmosphere_text}
+                </div>
+                <div style="margin-top: {max(0, 100-height)}px; font-size: 36px;">
+                    {rocket}
+                </div>
+                <div style="font-size: 24px;">{flame}</div>
+                <div style="margin-top: 10px; border-top: 2px dashed white; position: relative;">
+                    <div style="position: absolute; left: 0; top: 5px; font-size: 12px;">0%</div>
+                    <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 5px; font-size: 12px;">50%</div>
+                    <div style="position: absolute; right: 0; top: 5px; font-size: 12px;">100%</div>
+                </div>
+            </div>
+        """
+        st.markdown(rocket_html, unsafe_allow_html=True)
+
+        # Zusätzliche textliche Einschätzung
+        if height >= stratosphere_level:
+            st.success(f"🎯 {model_name}: Zufrieden ({prob:.2%}) – Stratosphäre erreicht!")
+        else:
+            st.warning(f"⚠️ {model_name}: Nicht zufrieden ({prob:.2%}) – Rakete bleibt in der Troposphäre.")
+            
+    st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit")
+    proba_xgb = xgb_model.predict_proba(scaled_input)[0][1]  # Wahrscheinlichkeit für Klasse 1 (zufrieden)
+    proba_rf = rf_model.predict_proba(scaled_input)[0][1]
+
+
+    # Zusammenfassung beider Modelle
+    st.markdown("---")
+    avg_prob = (proba_xgb + proba_rf) / 2
+    st.markdown(f"### 📊 Gesamtbewertung")
+    st.markdown(f"**Durchschnittliche Zufriedenheitswahrscheinlichkeit: {avg_prob:.2%}**")
+
+    if avg_prob >= 0.5:
+        st.success("✅ Der Kunde wird höchstwahrscheinlich zufrieden sein!")
+    elif avg_prob >= 0.4:
+        st.info("ℹ️ Der Kunde könnte zufrieden sein, aber es besteht Verbesserungspotential.")
+    else:
+        st.error("❌ Der Kunde wird wahrscheinlich unzufrieden sein. Maßnahmen sollten ergriffen werden!")
+
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        render_rocket_probability(proba_xgb, "XGBoost")
+
+    with col2:
+        render_rocket_probability(proba_rf, "Random Forest")
