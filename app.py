@@ -5,6 +5,30 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from llm import generate_action_recommendations
+st.set_page_config(page_title="Airline Satisfaction Dashboard", layout="wide", page_icon="🧊", initial_sidebar_state="expanded"
+    )
+
+with st.sidebar:
+    st.image("assets/logo.png", width=200)
+    st.title("Airline Satisfaction Dashboard")
+    st.subheader("Überblick")
+    st.write(
+        "Dieses Dashboard bietet Einblicke in die Zufriedenheit von Flugreisenden und ermöglicht Vorhersagen basierend auf verschiedenen Modellen."
+    )
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-image: url("assets/background.jpg");
+            background-size: cover;
+            background-position: center;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    
 
 # Lade Modelle und Scaler
 xgb_model = joblib.load("models/xgb_best_model-2.pkl")
@@ -22,7 +46,6 @@ feature_order = [
     'Class_Economy Plus', 'Delay'
 ]
 
-st.set_page_config(page_title="Airline Satisfaction Dashboard", layout="wide")
 st.title("✈️ Airline Satisfaction Prediction & Insights App")
 
 # Tabs
@@ -87,7 +110,15 @@ with tab2:
             df["Random Forest Prediction"] = rf_model.predict(df_scaled)
             st.success("Vorhersage erfolgreich durchgeführt!")
             st.dataframe(df.head())
+if "openai_model" not in st.session_state:
+    st.session_state["openai_model"] = "gpt-3.5-turbo"
 
+st.selectbox(
+    "Welches GPT-Modell verwenden?",
+    options=["gpt-3.5-turbo", "gpt-4"],
+    index=0 if st.session_state["openai_model"] == "gpt-3.5-turbo" else 1,
+    key="openai_model"
+)
 # Tab 3: Manueller Input
 with tab3:
     st.subheader("Manuelle Eingabe eines Beispiels")
@@ -188,6 +219,26 @@ with tab3:
     st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit")
     proba_xgb = xgb_model.predict_proba(scaled_input)[0][1]  # Wahrscheinlichkeit für Klasse 1 (zufrieden)
     proba_rf = rf_model.predict_proba(scaled_input)[0][1]
+    
+    st.markdown("### 💡 Empfehlungen zur Verbesserung der Zufriedenheit")
+
+    # Merkmalsauswahl für Empfehlungen
+    relevant_features = {k: v for k, v in input_df.iloc[0].items() if k in [
+        "Online Boarding", "Type of Travel_Personal", "In-flight Wifi Service",
+        "In-flight Entertainment", "Class_Economy", "Seat Comfort", "Customer Type_Returning",
+        "Leg Room Service", "On-board Service", "Flight Distance", "Cleanliness",
+        "Baggage Handling", "Age", "In-flight Service", "Check-in Service",
+        "Ease of Online Booking", "Departure and Arrival Time Convenience", 
+        "Gate Location", "Food and Drink", "Delay"
+    ]}
+
+    with st.spinner("Generiere Empfehlungen basierend auf deinen Eingaben..."):
+        try:
+            recommendation = generate_action_recommendations(relevant_features)
+            st.success("✅ Empfehlungen erfolgreich generiert:")
+            st.markdown(recommendation)
+        except Exception as e:
+            st.error(f"Fehler bei der Generierung: {e}")
 
 
     # Zusammenfassung beider Modelle
