@@ -14,3 +14,7 @@ __pycache__/
 # Sonstige IDE-Dateien
 .DS_Store
 .vscode/models/*.pkl
+
+# Secrets
+*.env
+*.secrets.toml
