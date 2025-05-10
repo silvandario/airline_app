@@ -11,7 +11,7 @@ import os
 
 # Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
 # Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
-from llm import generate_action_recommendations
+from llm import generate_action_recommendations, generate_segment_recommendations_from_shap
 
 # Seiteneinrichtung
 st.set_page_config(
@@ -128,24 +128,22 @@ with tab_insights:
     st.header("📊 Feature Insights")
 
     # Slider für die Anzahl der Top-Features
-    # Stelle sicher, dass feature_order nicht leer ist, bevor len() darauf angewendet wird.
     max_features_for_slider = len(feature_order) if feature_order else 20
     num_features_to_display = st.slider(
         "Anzahl der Top-Features für Diagramme auswählen:",
         min_value=3,
-        # Stellt sicher, dass max_value mindestens min_value ist
         max_value=max(3, min(20, max_features_for_slider)),
-        # Stellt sicher, dass value innerhalb von min_value und max_value liegt
         value=min(max(3, min(20, max_features_for_slider)), 10 if max_features_for_slider >=10 else max_features_for_slider if max_features_for_slider >=3 else 3),
-        key="top_n_slider_insights_main" # Eindeutiger Key
+        key="top_n_slider_insights_main" 
     )
 
     sub_tab1_global, sub_tab1_segments = st.tabs(["🎯 Globale Feature Importances", "🔍 Segmente"])
 
     with sub_tab1_global:
+        # ... (Code für globale Feature Importances bleibt unverändert) ...
         st.header("🎯 Globale Feature Importances")
 
-        if models: # Überprüfen, ob Modelle geladen wurden
+        if models: 
             models_to_display = {
                 "XGBoost": (models.get("xgb"), cm.viridis, "Viridis"),
                 "Random Forest": (models.get("rf"), cm.plasma, "Plasma"),
@@ -159,7 +157,7 @@ with tab_insights:
                     continue
 
                 raw_importance = pd.Series(model.feature_importances_, index=feature_order)
-                if raw_importance.sum() == 0: # Verhindert Division durch Null
+                if raw_importance.sum() == 0: 
                     importance = raw_importance
                 else:
                     importance = raw_importance / raw_importance.sum()
@@ -169,21 +167,16 @@ with tab_insights:
                     st.write("Keine Feature Importances für dieses Modell zu visualisieren.")
                     continue
                 
-                # Normalisiere die Werte für Farben zwischen 0 und 1
                 if (importance.max() - importance.min()) == 0:
-                    norm_values = pd.Series(0.5, index=importance.index) # Alle gleiche Farbe, wenn keine Varianz
+                    norm_values = pd.Series(0.5, index=importance.index) 
                 else:
                     norm_values = (importance - importance.min()) / (importance.max() - importance.min())
                 
                 colors = [color_palette(val) for val in norm_values]
                 fig, ax = plt.subplots(figsize=(10, 6))
-
-                # Verwende den Wert vom Slider
                 current_top_n_global = min(num_features_to_display, len(importance))
-                
                 top_importance = importance.iloc[:current_top_n_global]
                 top_colors = colors[:current_top_n_global]
-
                 y_pos = range(len(top_importance))
                 ax.barh(y_pos, top_importance.values, color=top_colors)
                 ax.set_yticks(y_pos)
@@ -194,14 +187,14 @@ with tab_insights:
                 if not top_importance.empty:
                     ax.set_xlim(0, top_importance.iloc[0] * 1.1 if top_importance.iloc[0] > 0 else 0.1)
                 else:
-                    ax.set_xlim(0, 0.1) # Fallback für leere top_importance
-
+                    ax.set_xlim(0, 0.1) 
                 plt.tight_layout()
                 st.pyplot(fig)
-                plt.close(fig) # Wichtig, um Speicher freizugeben
+                plt.close(fig) 
         else:
             st.warning("Modelle wurden nicht geladen. Feature Importances können nicht angezeigt werden.")
         st.markdown("---")
+
 
     with sub_tab1_segments:
         st.header("🔍 SHAP-basierte Segmentanalyse")
@@ -217,12 +210,11 @@ with tab_insights:
             segment_class = st.selectbox(
                 "Flugklasse", ["Alle", "Economy", "Economy Plus", "Business"], key="filter_class"
             )
-            # Dynamische Min/Max-Werte für Slider basierend auf X_train_df, falls vorhanden
             age_min = int(X_train_df['Age'].min()) if not X_train_df.empty and 'Age' in X_train_df.columns else 18
             age_max = int(X_train_df['Age'].max()) if not X_train_df.empty and 'Age' in X_train_df.columns else 85
             segment_age_range = st.slider(
                 "Altersbereich", min_value=age_min, max_value=age_max, 
-                value=(age_min, age_max) if age_min < age_max else (age_min, age_min +1 if age_min < 100 else age_min), # Sicherstellen, dass value[0] <= value[1]
+                value=(age_min, age_max) if age_min < age_max else (age_min, age_min +1 if age_min < 100 else age_min),
                 key="filter_age"
             )
             segment_travel_type = st.selectbox(
@@ -239,7 +231,7 @@ with tab_insights:
             dist_max = int(X_train_df['Flight Distance'].max()) if not X_train_df.empty and 'Flight Distance' in X_train_df.columns else 5000
             segment_distance_range = st.slider(
                 "Flugdistanz (km)", min_value=dist_min, max_value=dist_max, 
-                value=(dist_min, dist_max) if dist_min < dist_max else (dist_min, dist_min +1 if dist_min < 10000 else dist_min), # Sicherstellen, dass value[0] <= value[1]
+                value=(dist_min, dist_max) if dist_min < dist_max else (dist_min, dist_min +1 if dist_min < 10000 else dist_min),
                 key="filter_distance"
             )
 
@@ -251,27 +243,28 @@ with tab_insights:
                 if segment_class == "Economy": segment_mask &= (X_train_df['Class_Economy'] == 1)
                 elif segment_class == "Economy Plus": segment_mask &= (X_train_df['Class_Economy Plus'] == 1)
                 else: segment_mask &= ((X_train_df['Class_Economy'] == 0) & (X_train_df['Class_Economy Plus'] == 0))
-            segment_mask &= (X_train_df['Age'] >= segment_age_range[0]) & (X_train_df['Age'] <= segment_age_range[1])
-            if segment_travel_type != "Alle":
+            
+            # Überprüfe, ob Spalten existieren, bevor gefiltert wird
+            if 'Age' in X_train_df.columns:
+                segment_mask &= (X_train_df['Age'] >= segment_age_range[0]) & (X_train_df['Age'] <= segment_age_range[1])
+            if 'Type of Travel_Personal' in X_train_df.columns and segment_travel_type != "Alle":
                 segment_mask &= (X_train_df['Type of Travel_Personal'] == (1 if segment_travel_type == "Privat" else 0))
-            if segment_customer_type != "Alle":
+            if 'Customer Type_Returning' in X_train_df.columns and segment_customer_type != "Alle":
                 segment_mask &= (X_train_df['Customer Type_Returning'] == (1 if segment_customer_type == "Wiederkehrend" else 0))
-            if segment_gender != "Alle":
+            if 'Gender_Male' in X_train_df.columns and segment_gender != "Alle":
                 segment_mask &= (X_train_df['Gender_Male'] == (1 if segment_gender == "Männlich" else 0))
-            segment_mask &= (X_train_df['Flight Distance'] >= segment_distance_range[0]) & (X_train_df['Flight Distance'] <= segment_distance_range[1])
+            if 'Flight Distance' in X_train_df.columns:
+                segment_mask &= (X_train_df['Flight Distance'] >= segment_distance_range[0]) & (X_train_df['Flight Distance'] <= segment_distance_range[1])
+
 
             filtered_df = X_train_df[segment_mask]
-            filtered_shap = shap_values_df[segment_mask]
+            filtered_shap = shap_values_df.loc[segment_mask] # .loc verwenden für konsistentes Verhalten
             num_samples = len(filtered_df)
             st.write(f"Anzahl der Datenpunkte im ausgewählten Segment: **{num_samples}**")
 
             if num_samples > 0:
                 mean_abs_shap = filtered_shap.abs().mean().sort_values(ascending=False)
-                # Für die Tendenz die Reihenfolge von mean_abs_shap verwenden
                 mean_shap_for_tendency = filtered_shap.mean().reindex(mean_abs_shap.index)
-
-
-                # Verwende den Wert vom Slider
                 current_top_n_shap = min(num_features_to_display, len(mean_abs_shap))
 
                 st.subheader(f"Top {current_top_n_shap} Einflussfaktoren für dieses Segment")
@@ -280,10 +273,10 @@ with tab_insights:
                     'Einfluss-Stärke': mean_abs_shap.values[:current_top_n_shap],
                     'Tendenz': ["Positiv ✅" if val > 0 else ("Negativ ❌" if val < 0 else "Neutral ➖") for val in mean_shap_for_tendency.loc[mean_abs_shap.index[:current_top_n_shap]].values]
                 })
-                st.dataframe(influence_df)
+                st.dataframe(influence_df.style.format({"Einfluss-Stärke": "{:.2f}"})) # Formatierung für bessere Lesbarkeit
 
                 st.subheader("SHAP Summary Plot (Bar)")
-                fig_bar_shap, ax_bar_shap = plt.subplots(figsize=(10, max(6, current_top_n_shap * 0.5))) # Dynamische Höhe
+                fig_bar_shap, ax_bar_shap = plt.subplots(figsize=(10, max(6, current_top_n_shap * 0.5)))
                 sorted_idx = mean_abs_shap.index[:current_top_n_shap][::-1]
                 bar_colors = ['green' if mean_shap_for_tendency[feat] > 0 else ('red' if mean_shap_for_tendency[feat] < 0 else 'grey') for feat in sorted_idx]
                 
@@ -303,23 +296,43 @@ with tab_insights:
                 st.pyplot(fig_bar_shap)
                 plt.close(fig_bar_shap)
 
-                if st.checkbox("Zeige SHAP Beeswarm Plot (detailliertere Ansicht)"):
+                if st.checkbox("Zeige SHAP Beeswarm Plot (detailliertere Ansicht)", key="beeswarm_checkbox"):
                     st.warning("Diese Visualisierung kann bei grossen Segmenten länger dauern.")
                     max_display_beeswarm = min(num_samples, 500)
                     sample_indices = np.random.choice(filtered_df.index, size=max_display_beeswarm, replace=False) if num_samples > max_display_beeswarm else filtered_df.index
                     
-                    fig_beeswarm, ax_beeswarm = plt.subplots() # Neue Figur für Beeswarm
+                    # Sicherstellen, dass die Spalten für SHAP Plot übereinstimmen
+                    shap_values_for_plot = filtered_shap.loc[sample_indices, feature_order].values
+                    feature_values_for_plot = filtered_df.loc[sample_indices, feature_order]
+
+                    fig_beeswarm, ax_beeswarm = plt.subplots()
                     shap.summary_plot(
-                        filtered_shap.loc[sample_indices].reindex(columns=feature_order, fill_value=0).values, # Sicherstellen der Spaltenreihenfolge
-                        filtered_df.loc[sample_indices].reindex(columns=feature_order, fill_value=0), # Sicherstellen der Spaltenreihenfolge
-                        # feature_names=filtered_df.columns, # Wird von shap intern geholt
-                        max_display=current_top_n_shap, # Gesteuert durch Slider
+                        shap_values_for_plot,
+                        feature_values_for_plot,
+                        max_display=current_top_n_shap,
                         show=False,
                         plot_size=(10, max(8, current_top_n_shap * 0.6))
                     )
                     plt.tight_layout()
                     st.pyplot(fig_beeswarm)
-                    plt.close(fig_beeswarm) # Figur schließen
+                    plt.close(fig_beeswarm)
+                
+                # ----- Integration der LLM-Analyse für Segmente -----
+                st.markdown("---")
+                st.subheader("🤖 KI-basierte Analyse und Handlungsempfehlungen für dieses Segment")
+                if st.button("Segment analysieren und Empfehlungen generieren", key="analyze_segment_llm_button"):
+                    if not influence_df.empty:
+                        with st.spinner("Generiere Handlungsempfehlungen für das Segment basierend auf SHAP-Analyse..."):
+                            try:
+                                # influence_df enthält bereits die Top N Features für das Segment
+                                recommendations_segment = generate_segment_recommendations_from_shap(influence_df)
+                                st.success("✅ Empfehlungen erfolgreich generiert:")
+                                st.markdown(recommendations_segment)
+                            except Exception as e:
+                                st.error(f"Fehler bei der Generierung der Segment-Empfehlungen: {e}")
+                                st.exception(e)
+                    else:
+                        st.warning("Keine Daten im Segment für die Analyse vorhanden.")
             else:
                 st.warning("Keine Daten für das ausgewählte Segment gefunden. Bitte passen Sie die Filter an.")
 
