@@ -4,11 +4,13 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import seaborn as sns
-import lightgbm as lgb
+import seaborn as sns # Behalte ich bei, da es im Originalimport war
+import lightgbm as lgb # Behalte ich bei, da es im Originalimport war
 import shap
 import os
 
+# Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
+# Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
 from llm import generate_action_recommendations
 
 # Seiteneinrichtung
@@ -38,45 +40,54 @@ def load_shap_data_assets():
     shap_values_df = joblib.load("models/shap_values_df_train.pkl")
     return X_train_df, shap_values_df
 
-@st.cache_resource
-def get_shap_explainer(_model):
-    """Lädt oder erstellt einen SHAP Explainer für das Modell"""
-    try:
-        # Versuche gespeicherten Explainer zu laden
-        explainer = joblib.load("models/shap_explainer_lgbm.pkl")
-    except FileNotFoundError:
-        # Erstelle einen neuen Explainer, wenn keiner vorhanden ist
-        explainer = shap.TreeExplainer(_model)
-    return explainer
 
 # Modelle und Daten laden
+# Globale Variablen für Fallback definieren
+fallback_feature_order = [
+    'Age', 'Flight Distance', 'Departure and Arrival Time Convenience',
+    'Ease of Online Booking', 'Check-in Service', 'Online Boarding',
+    'Gate Location', 'On-board Service', 'Seat Comfort', 'Leg Room Service',
+    'Cleanliness', 'Food and Drink', 'In-flight Service', 'In-flight Wifi Service',
+    'In-flight Entertainment', 'Baggage Handling', 'Gender_Male',
+    'Customer Type_Returning', 'Type of Travel_Personal', 'Class_Economy',
+    'Class_Economy Plus', 'Delay'
+]
+models = None
+X_train_df = pd.DataFrame(columns=fallback_feature_order)
+shap_values_df = pd.DataFrame(columns=fallback_feature_order)
+feature_order = fallback_feature_order
+explainer = None
+
+
 try:
     models = load_models()
     X_train_df, shap_values_df = load_shap_data_assets()
-    feature_order = list(X_train_df.columns)  # Dynamische Feature-Reihenfolge aus den Trainingsdaten
-    explainer = get_shap_explainer(models["lgbm"])
+    if not X_train_df.empty:
+        feature_order = list(X_train_df.columns)
+    else: # Sollte nicht passieren, wenn load_shap_data_assets erfolgreich ist
+        feature_order = fallback_feature_order
+
 except Exception as e:
     st.error(f"Fehler beim Laden der Modelle oder Daten: {e}")
-    feature_order = [
-        'Age', 'Flight Distance', 'Departure and Arrival Time Convenience',
-        'Ease of Online Booking', 'Check-in Service', 'Online Boarding',
-        'Gate Location', 'On-board Service', 'Seat Comfort', 'Leg Room Service',
-        'Cleanliness', 'Food and Drink', 'In-flight Service', 'In-flight Wifi Service',
-        'In-flight Entertainment', 'Baggage Handling', 'Gender_Male',
-        'Customer Type_Returning', 'Type of Travel_Personal', 'Class_Economy',
-        'Class_Economy Plus', 'Delay'
-    ]
+    # Beibehaltung der Fallback-Werte
+    feature_order = fallback_feature_order
+    models = {} # Leeres Dict, um KeyErrors später zu vermeiden
+    X_train_df = pd.DataFrame(columns=feature_order)
+    shap_values_df = pd.DataFrame(columns=feature_order)
+
 
 # Sidebar
 with st.sidebar:
-    st.image("assets/logo.png", width=200)
+    if os.path.exists("assets/logo.png"):
+        st.image("assets/logo.png", width=200)
+    else:
+        st.warning("Logo unter assets/logo.png nicht gefunden.")
     st.title("Airline Satisfaction Dashboard")
     st.subheader("Überblick")
     st.write(
         "Dieses Dashboard bietet Einblicke in die Zufriedenheit von Flugreisenden und ermöglicht Vorhersagen basierend auf verschiedenen Modellen."
     )
 
-    # GPT-Model Selector im Sidebar
     st.markdown("---")
     if "openai_model" not in st.session_state:
         st.session_state["openai_model"] = "gpt-3.5-turbo"
@@ -89,18 +100,21 @@ with st.sidebar:
     )
 
 # Hintergrundbild
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-image: url("assets/background.jpg");
-        background-size: cover;
-        background-position: center;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+if os.path.exists("assets/background.jpg"):
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-image: url("assets/background.jpg");
+            background-size: cover;
+            background-position: center;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.warning("Hintergrundbild unter assets/background.jpg nicht gefunden.")
 
 # Haupttitel
 st.title("✈️ Airline Satisfaction Prediction & Insights App")
@@ -112,227 +126,202 @@ tab_insights, tab_upload, tab_manual = st.tabs(["📊 Feature Insights", "📤 C
 # Tab 1: Feature Insights (mit Unter-Tabs)
 with tab_insights:
     st.header("📊 Feature Insights")
+
+    # Slider für die Anzahl der Top-Features
+    # Stelle sicher, dass feature_order nicht leer ist, bevor len() darauf angewendet wird.
+    max_features_for_slider = len(feature_order) if feature_order else 20
+    num_features_to_display = st.slider(
+        "Anzahl der Top-Features für Diagramme auswählen:",
+        min_value=3,
+        # Stellt sicher, dass max_value mindestens min_value ist
+        max_value=max(3, min(20, max_features_for_slider)),
+        # Stellt sicher, dass value innerhalb von min_value und max_value liegt
+        value=min(max(3, min(20, max_features_for_slider)), 10 if max_features_for_slider >=10 else max_features_for_slider if max_features_for_slider >=3 else 3),
+        key="top_n_slider_insights_main" # Eindeutiger Key
+    )
+
     sub_tab1_global, sub_tab1_segments = st.tabs(["🎯 Globale Feature Importances", "🔍 Segmente"])
 
     with sub_tab1_global:
         st.header("🎯 Globale Feature Importances")
 
-        # Feature Importances für alle Modelle mit unterschiedlichen Farbpaletten
-        models_to_display = {
-            "XGBoost": (models["xgb"], cm.viridis, "Viridis"),
-            "Random Forest": (models["rf"], cm.plasma, "Plasma"),
-            "LightGBM": (models["lgbm"], cm.coolwarm, "Blau-Rot Gradient")
-        }
+        if models: # Überprüfen, ob Modelle geladen wurden
+            models_to_display = {
+                "XGBoost": (models.get("xgb"), cm.viridis, "Viridis"),
+                "Random Forest": (models.get("rf"), cm.plasma, "Plasma"),
+                "LightGBM": (models.get("lgbm"), cm.coolwarm, "Blau-Rot Gradient")
+            }
 
-        for model_name, (model, color_palette, palette_name) in models_to_display.items():
-            st.subheader(f"{model_name}")
+            for model_name, (model, color_palette, palette_name) in models_to_display.items():
+                st.subheader(f"{model_name}")
+                if model is None or not hasattr(model, 'feature_importances_'):
+                    st.write(f"Modell {model_name} nicht verfügbar oder hat keine Feature Importances.")
+                    continue
 
-            # Feature Importances extrahieren und sortieren
-            raw_importance = pd.Series(model.feature_importances_, index=feature_order)
+                raw_importance = pd.Series(model.feature_importances_, index=feature_order)
+                if raw_importance.sum() == 0: # Verhindert Division durch Null
+                    importance = raw_importance
+                else:
+                    importance = raw_importance / raw_importance.sum()
+                importance = importance.sort_values(ascending=False)
 
-            # Normalisieren, sodass die Summe 1 ergibt (einheitliche Skala für alle Modelle)
-            importance = raw_importance / raw_importance.sum()
-            importance = importance.sort_values(ascending=False)  # Sortieren mit höchsten Werten zuerst
+                if importance.empty:
+                    st.write("Keine Feature Importances für dieses Modell zu visualisieren.")
+                    continue
+                
+                # Normalisiere die Werte für Farben zwischen 0 und 1
+                if (importance.max() - importance.min()) == 0:
+                    norm_values = pd.Series(0.5, index=importance.index) # Alle gleiche Farbe, wenn keine Varianz
+                else:
+                    norm_values = (importance - importance.min()) / (importance.max() - importance.min())
+                
+                colors = [color_palette(val) for val in norm_values]
+                fig, ax = plt.subplots(figsize=(10, 6))
 
-            # Normalisiere die Werte für Farben zwischen 0 und 1
-            norm_values = (importance - importance.min()) / (importance.max() - importance.min())
+                # Verwende den Wert vom Slider
+                current_top_n_global = min(num_features_to_display, len(importance))
+                
+                top_importance = importance.iloc[:current_top_n_global]
+                top_colors = colors[:current_top_n_global]
 
-            # Erstelle Farben basierend auf der zugewiesenen Palette
-            colors = [color_palette(val) for val in norm_values]
+                y_pos = range(len(top_importance))
+                ax.barh(y_pos, top_importance.values, color=top_colors)
+                ax.set_yticks(y_pos)
+                ax.set_yticklabels(top_importance.index)
+                ax.set_title(f"Top {current_top_n_global} Features - {model_name} (Normalisiert)")
+                ax.set_xlabel("Normalisierte Feature Importance")
+                ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.1%}'.format(x)))
+                if not top_importance.empty:
+                    ax.set_xlim(0, top_importance.iloc[0] * 1.1 if top_importance.iloc[0] > 0 else 0.1)
+                else:
+                    ax.set_xlim(0, 0.1) # Fallback für leere top_importance
 
-            # Plot erstellen
-            fig, ax = plt.subplots(figsize=(10, 6))
-
-            # Nur die Top 10 Features anzeigen (für bessere Lesbarkeit)
-            top_n = min(10, len(importance))
-            top_importance = importance.iloc[:top_n]
-            top_colors = colors[:top_n]
-
-            # Umgekehrte Reihenfolge für die Y-Achse (höchster Wert oben)
-            y_pos = range(len(top_importance))
-
-            # Horizontale Balken mit individuellen Farben in umgekehrter Reihenfolge
-            bars = ax.barh(y_pos, top_importance.values, color=top_colors)
-
-            # Setze die Y-Ticks auf die Feature-Namen in umgekehrter Reihenfolge
-            ax.set_yticks(y_pos)
-            ax.set_yticklabels(top_importance.index)
-
-            # Titel und Layout
-            ax.set_title(f"Top {top_n} Features - {model_name} (Normalisiert)")
-            ax.set_xlabel("Normalisierte Feature Importance")
-
-            # X-Achse als Prozentsatz formatieren
-            ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.1%}'.format(x)))
-
-            # Einheitlicher X-Achsenbereich für alle Diagramme
-            ax.set_xlim(0, top_importance.iloc[0] * 1.1)  # Maximalwert + 10% Puffer
-
-            plt.tight_layout()
-
-            # Plot anzeigen
-            st.pyplot(fig)
-
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close(fig) # Wichtig, um Speicher freizugeben
+        else:
+            st.warning("Modelle wurden nicht geladen. Feature Importances können nicht angezeigt werden.")
         st.markdown("---")
 
     with sub_tab1_segments:
-        # SHAP-basierte Segmentanalyse
         st.header("🔍 SHAP-basierte Segmentanalyse")
         st.write("""
         Diese Analyse zeigt, welche Faktoren die Zufriedenheit für spezifische Kundensegmente am stärksten beeinflussen.
         Nutzen Sie die Filter unten, um ein bestimmtes Segment zu definieren.
         """)
 
-        # Segment-Filter direkt unter SHAP-basierte Segmentanalyse
         st.subheader("🎯 Segmentfilter")
-
-        # Erstellen von zwei Spalten für übersichtlichere Filter-Anordnung
         filter_col1, filter_col2 = st.columns(2)
 
         with filter_col1:
             segment_class = st.selectbox(
-                "Flugklasse",
-                ["Alle", "Economy", "Economy Plus", "Business"],
-                key="filter_class"
+                "Flugklasse", ["Alle", "Economy", "Economy Plus", "Business"], key="filter_class"
             )
-
+            # Dynamische Min/Max-Werte für Slider basierend auf X_train_df, falls vorhanden
+            age_min = int(X_train_df['Age'].min()) if not X_train_df.empty and 'Age' in X_train_df.columns else 18
+            age_max = int(X_train_df['Age'].max()) if not X_train_df.empty and 'Age' in X_train_df.columns else 85
             segment_age_range = st.slider(
-                "Altersbereich",
-                min_value=18,
-                max_value=85,
-                value=(25, 60),
+                "Altersbereich", min_value=age_min, max_value=age_max, 
+                value=(age_min, age_max) if age_min < age_max else (age_min, age_min +1 if age_min < 100 else age_min), # Sicherstellen, dass value[0] <= value[1]
                 key="filter_age"
             )
-
             segment_travel_type = st.selectbox(
-                "Reisetyp",
-                ["Alle", "Geschäftlich", "Privat"],
-                key="filter_travel"
+                "Reisetyp", ["Alle", "Geschäftlich", "Privat"], key="filter_travel"
             )
-
         with filter_col2:
             segment_customer_type = st.selectbox(
-                "Kundentyp",
-                ["Alle", "Neu", "Wiederkehrend"],
-                key="filter_customer"
+                "Kundentyp", ["Alle", "Neu", "Wiederkehrend"], key="filter_customer"
             )
-
             segment_gender = st.selectbox(
-                "Geschlecht",
-                ["Alle", "Männlich", "Weiblich"],
-                key="filter_gender"
+                "Geschlecht", ["Alle", "Männlich", "Weiblich"], key="filter_gender"
             )
-
+            dist_min = int(X_train_df['Flight Distance'].min()) if not X_train_df.empty and 'Flight Distance' in X_train_df.columns else 0
+            dist_max = int(X_train_df['Flight Distance'].max()) if not X_train_df.empty and 'Flight Distance' in X_train_df.columns else 5000
             segment_distance_range = st.slider(
-                "Flugdistanz (km)",
-                min_value=0,
-                max_value=5000,
-                value=(0, 5000),
+                "Flugdistanz (km)", min_value=dist_min, max_value=dist_max, 
+                value=(dist_min, dist_max) if dist_min < dist_max else (dist_min, dist_min +1 if dist_min < 10000 else dist_min), # Sicherstellen, dass value[0] <= value[1]
                 key="filter_distance"
             )
 
-        # Filtere die Daten basierend auf den Segment-Filtern
-        segment_mask = pd.Series(True, index=X_train_df.index)
-
-        # Klasse filtern
-        if segment_class != "Alle":
-            if segment_class == "Economy":
-                segment_mask &= (X_train_df['Class_Economy'] == 1)
-            elif segment_class == "Economy Plus":
-                segment_mask &= (X_train_df['Class_Economy Plus'] == 1)
-            else:  # Business
-                segment_mask &= ((X_train_df['Class_Economy'] == 0) & (X_train_df['Class_Economy Plus'] == 0))
-
-        # Alter filtern
-        segment_mask &= (X_train_df['Age'] >= segment_age_range[0]) & (X_train_df['Age'] <= segment_age_range[1])
-
-        # Reisetyp filtern
-        if segment_travel_type != "Alle":
-            is_personal = segment_travel_type == "Privat"
-            segment_mask &= (X_train_df['Type of Travel_Personal'] == int(is_personal))
-
-        # Kundentyp filtern
-        if segment_customer_type != "Alle":
-            is_returning = segment_customer_type == "Wiederkehrend"
-            segment_mask &= (X_train_df['Customer Type_Returning'] == int(is_returning))
-
-        # Geschlecht filtern
-        if segment_gender != "Alle":
-            is_male = segment_gender == "Männlich"
-            segment_mask &= (X_train_df['Gender_Male'] == int(is_male))
-
-        # Flugdistanz filtern
-        segment_mask &= (X_train_df['Flight Distance'] >= segment_distance_range[0]) & (X_train_df['Flight Distance'] <= segment_distance_range[1])
-
-        # Gefilterte Daten anzeigen
-        filtered_df = X_train_df[segment_mask]
-        filtered_shap = shap_values_df[segment_mask]
-
-        num_samples = len(filtered_df)
-        st.write(f"Anzahl der Datenpunkte im ausgewählten Segment: **{num_samples}**")
-
-        if num_samples > 0:
-            # Berechne die durchschnittlichen SHAP-Werte für das Segment
-            mean_abs_shap = filtered_shap.abs().mean().sort_values(ascending=False)
-            mean_shap = filtered_shap.mean().sort_values(ascending=False)
-
-            # Zeige die Top N Faktoren
-            top_n = 10
-            st.subheader(f"Top {top_n} Einflussfaktoren für dieses Segment")
-
-            # Erstelle eine Tabelle mit den Top-Einflussfaktoren
-            influence_df = pd.DataFrame({
-                'Feature': mean_abs_shap.index[:top_n],
-                'Einfluss-Stärke': mean_abs_shap.values[:top_n],
-                'Tendenz': ["Positiv ✅" if val > 0 else "Negativ ❌" for val in mean_shap.loc[mean_abs_shap.index[:top_n]].values]
-            })
-
-            st.dataframe(influence_df)
-
-            # SHAP Summary Plot
-            st.subheader("SHAP Summary Plot")
-            fig, ax = plt.subplots(figsize=(10, 8))
-
-            # Bar plot der mittleren absoluten SHAP-Werte
-            sorted_idx = mean_abs_shap.index[:top_n][::-1]  # Umkehren für horizontalen Plot
-            colors = ['red' if mean_shap[feat] < 0 else 'green' for feat in sorted_idx]
-
-            plt.barh(range(len(sorted_idx)), mean_abs_shap[sorted_idx].values, color=colors)
-            plt.yticks(range(len(sorted_idx)), sorted_idx)
-            plt.xlabel("Mittlerer absoluter SHAP-Wert")
-            plt.title("Einfluss der Features auf die Zufriedenheit")
-
-            # Legende für die Farben
-            from matplotlib.patches import Patch
-            legend_elements = [
-                Patch(facecolor='green', label='Positiver Einfluss auf Zufriedenheit'),
-                Patch(facecolor='red', label='Negativer Einfluss auf Zufriedenheit')
-            ]
-            plt.legend(handles=legend_elements)
-
-            st.pyplot(fig)
-
-            # Option für SHAP Beeswarm Plot
-            if st.checkbox("Zeige SHAP Beeswarm Plot (detailliertere Ansicht)"):
-                st.warning("Diese Visualisierung kann bei grossen Segmenten länger dauern.")
-
-                # Wähle eine Stichprobe, wenn zu viele Datenpunkte
-                max_display = min(num_samples, 500)
-                sample_indices = np.random.choice(filtered_df.index, size=max_display, replace=False) if num_samples > max_display else filtered_df.index
-
-                # Erstelle den SHAP Beeswarm Plot
-                fig, ax = plt.subplots(figsize=(10, 12))
-                shap.summary_plot(
-                    filtered_shap.loc[sample_indices].values,
-                    filtered_df.loc[sample_indices],
-                    feature_names=filtered_df.columns,
-                    max_display=top_n,
-                    show=False
-                )
-                st.pyplot(fig)
+        if X_train_df.empty or shap_values_df.empty:
+            st.warning("Trainingsdaten oder SHAP-Werte nicht geladen. Segmentanalyse nicht möglich.")
         else:
-            st.warning("Keine Daten für das ausgewählte Segment gefunden. Bitte passen Sie die Filter an.")
+            segment_mask = pd.Series(True, index=X_train_df.index)
+            if segment_class != "Alle":
+                if segment_class == "Economy": segment_mask &= (X_train_df['Class_Economy'] == 1)
+                elif segment_class == "Economy Plus": segment_mask &= (X_train_df['Class_Economy Plus'] == 1)
+                else: segment_mask &= ((X_train_df['Class_Economy'] == 0) & (X_train_df['Class_Economy Plus'] == 0))
+            segment_mask &= (X_train_df['Age'] >= segment_age_range[0]) & (X_train_df['Age'] <= segment_age_range[1])
+            if segment_travel_type != "Alle":
+                segment_mask &= (X_train_df['Type of Travel_Personal'] == (1 if segment_travel_type == "Privat" else 0))
+            if segment_customer_type != "Alle":
+                segment_mask &= (X_train_df['Customer Type_Returning'] == (1 if segment_customer_type == "Wiederkehrend" else 0))
+            if segment_gender != "Alle":
+                segment_mask &= (X_train_df['Gender_Male'] == (1 if segment_gender == "Männlich" else 0))
+            segment_mask &= (X_train_df['Flight Distance'] >= segment_distance_range[0]) & (X_train_df['Flight Distance'] <= segment_distance_range[1])
 
+            filtered_df = X_train_df[segment_mask]
+            filtered_shap = shap_values_df[segment_mask]
+            num_samples = len(filtered_df)
+            st.write(f"Anzahl der Datenpunkte im ausgewählten Segment: **{num_samples}**")
+
+            if num_samples > 0:
+                mean_abs_shap = filtered_shap.abs().mean().sort_values(ascending=False)
+                # Für die Tendenz die Reihenfolge von mean_abs_shap verwenden
+                mean_shap_for_tendency = filtered_shap.mean().reindex(mean_abs_shap.index)
+
+
+                # Verwende den Wert vom Slider
+                current_top_n_shap = min(num_features_to_display, len(mean_abs_shap))
+
+                st.subheader(f"Top {current_top_n_shap} Einflussfaktoren für dieses Segment")
+                influence_df = pd.DataFrame({
+                    'Feature': mean_abs_shap.index[:current_top_n_shap],
+                    'Einfluss-Stärke': mean_abs_shap.values[:current_top_n_shap],
+                    'Tendenz': ["Positiv ✅" if val > 0 else ("Negativ ❌" if val < 0 else "Neutral ➖") for val in mean_shap_for_tendency.loc[mean_abs_shap.index[:current_top_n_shap]].values]
+                })
+                st.dataframe(influence_df)
+
+                st.subheader("SHAP Summary Plot (Bar)")
+                fig_bar_shap, ax_bar_shap = plt.subplots(figsize=(10, max(6, current_top_n_shap * 0.5))) # Dynamische Höhe
+                sorted_idx = mean_abs_shap.index[:current_top_n_shap][::-1]
+                bar_colors = ['green' if mean_shap_for_tendency[feat] > 0 else ('red' if mean_shap_for_tendency[feat] < 0 else 'grey') for feat in sorted_idx]
+                
+                ax_bar_shap.barh(range(len(sorted_idx)), mean_abs_shap[sorted_idx].values, color=bar_colors)
+                ax_bar_shap.set_yticks(range(len(sorted_idx)))
+                ax_bar_shap.set_yticklabels(sorted_idx)
+                ax_bar_shap.set_xlabel("Mittlerer absoluter SHAP-Wert")
+                ax_bar_shap.set_title("Einfluss der Features auf die Zufriedenheit")
+                from matplotlib.patches import Patch
+                legend_elements = [
+                    Patch(facecolor='green', label='Positiver Einfluss'),
+                    Patch(facecolor='red', label='Negativer Einfluss'),
+                    Patch(facecolor='grey', label='Neutraler Einfluss')
+                ]
+                ax_bar_shap.legend(handles=legend_elements)
+                plt.tight_layout()
+                st.pyplot(fig_bar_shap)
+                plt.close(fig_bar_shap)
+
+                if st.checkbox("Zeige SHAP Beeswarm Plot (detailliertere Ansicht)"):
+                    st.warning("Diese Visualisierung kann bei grossen Segmenten länger dauern.")
+                    max_display_beeswarm = min(num_samples, 500)
+                    sample_indices = np.random.choice(filtered_df.index, size=max_display_beeswarm, replace=False) if num_samples > max_display_beeswarm else filtered_df.index
+                    
+                    fig_beeswarm, ax_beeswarm = plt.subplots() # Neue Figur für Beeswarm
+                    shap.summary_plot(
+                        filtered_shap.loc[sample_indices].reindex(columns=feature_order, fill_value=0).values, # Sicherstellen der Spaltenreihenfolge
+                        filtered_df.loc[sample_indices].reindex(columns=feature_order, fill_value=0), # Sicherstellen der Spaltenreihenfolge
+                        # feature_names=filtered_df.columns, # Wird von shap intern geholt
+                        max_display=current_top_n_shap, # Gesteuert durch Slider
+                        show=False,
+                        plot_size=(10, max(8, current_top_n_shap * 0.6))
+                    )
+                    plt.tight_layout()
+                    st.pyplot(fig_beeswarm)
+                    plt.close(fig_beeswarm) # Figur schließen
+            else:
+                st.warning("Keine Daten für das ausgewählte Segment gefunden. Bitte passen Sie die Filter an.")
 
 # Tab 2: CSV Upload & Predict
 with tab_upload:
@@ -341,247 +330,205 @@ with tab_upload:
 
     if uploaded_file:
         try:
-            df = pd.read_csv(uploaded_file)
+            df_upload = pd.read_csv(uploaded_file) # Neuer Variablenname, um Konflikte zu vermeiden
 
-            if not set(feature_order).issubset(df.columns):
-                missing_cols = set(feature_order) - set(df.columns)
+            # Überprüfen, ob alle Feature-Order-Spalten in df_upload vorhanden sind
+            # und ob der Scaler und die Modelle geladen sind
+            if not set(feature_order).issubset(df_upload.columns):
+                missing_cols = set(feature_order) - set(df_upload.columns)
                 st.error(f"Die CSV-Datei enthält nicht alle benötigten Spalten. Fehlende Spalten: {', '.join(missing_cols)}")
+            elif models is None or "scaler" not in models or models["scaler"] is None:
+                st.error("Scaler-Modell nicht geladen. Vorhersage nicht möglich.")
             else:
-                # Skaliere die Daten und mache Vorhersagen mit allen Modellen
-                df_scaled = models["scaler"].transform(df[feature_order])
+                # Nur die benötigten Spalten in der richtigen Reihenfolge auswählen
+                df_for_scaling = df_upload[feature_order].copy()
+                
+                # Einfache Imputation für fehlende Werte (z.B. mit 0) - Anpassen falls nötig!
+                for col in df_for_scaling.columns:
+                    if df_for_scaling[col].isnull().any():
+                        st.warning(f"Spalte '{col}' in den hochgeladenen Daten enthält fehlende Werte. Diese werden mit 0 ersetzt.")
+                        df_for_scaling[col] = df_for_scaling[col].fillna(0)
 
-                df["XGBoost Prediction"] = models["xgb"].predict(df_scaled)
-                df["Random Forest Prediction"] = models["rf"].predict(df_scaled)
-                df["LightGBM Prediction"] = models["lgbm"].predict(df_scaled)
+                df_scaled = models["scaler"].transform(df_for_scaling)
+                
+                # Kopie des Original-DataFrames für die Ausgabe der Ergebnisse
+                results_df = df_upload.copy()
 
-                # Füge Wahrscheinlichkeiten hinzu
-                df["XGBoost Prob"] = models["xgb"].predict_proba(df_scaled)[:, 1]
-                df["Random Forest Prob"] = models["rf"].predict_proba(df_scaled)[:, 1]
-                df["LightGBM Prob"] = models["lgbm"].predict_proba(df_scaled)[:, 1]
+                for model_key in ["xgb", "rf", "lgbm"]:
+                    if model_key in models and models[model_key] is not None:
+                        model_instance = models[model_key]
+                        pred_col_name = f"{model_key.upper()} Prediction"
+                        prob_col_name = f"{model_key.upper()} Prob (Zufrieden)"
+                        
+                        results_df[pred_col_name] = model_instance.predict(df_scaled)
+                        results_df[prob_col_name] = model_instance.predict_proba(df_scaled)[:, 1] # Wahrsch. für Klasse 1
+                    else:
+                        st.warning(f"{model_key.upper()}-Modell nicht geladen. Keine Vorhersage möglich.")
+
 
                 st.success("✅ Vorhersage erfolgreich durchgeführt!")
-
-                # Zeige die ersten Zeilen des DataFrames
                 st.subheader("Vorhersageergebnisse")
-                st.dataframe(df)
+                st.dataframe(results_df)
 
-                # Zusammenfassung der Vorhersagen
-                predictions_summary = {
-                    "Modell": ["XGBoost", "Random Forest", "LightGBM"],
-                    "Zufriedene Kunden": [
-                        df["XGBoost Prediction"].sum(),
-                        df["Random Forest Prediction"].sum(),
-                        df["LightGBM Prediction"].sum()
-                    ],
-                    "Zufriedenheitsrate": [
-                        f"{df['XGBoost Prediction'].mean() * 100:.2f}%",
-                        f"{df['Random Forest Prediction'].mean() * 100:.2f}%",
-                        f"{df['LightGBM Prediction'].mean() * 100:.2f}%"
-                    ]
-                }
+                predictions_summary_list = []
+                for model_key in ["xgb", "rf", "lgbm"]:
+                    pred_col = f"{model_key.upper()} Prediction"
+                    if pred_col in results_df.columns:
+                        num_satisfied = results_df[pred_col].sum()
+                        total_customers = len(results_df)
+                        satisfaction_rate_val = (num_satisfied / total_customers) * 100 if total_customers > 0 else 0
+                        predictions_summary_list.append({
+                            "Modell": model_key.upper(),
+                            "Zufriedene Kunden": num_satisfied,
+                            "Zufriedenheitsrate": f"{satisfaction_rate_val:.2f}%"
+                        })
+                
+                if predictions_summary_list:
+                    summary_df = pd.DataFrame(predictions_summary_list)
+                    st.subheader("Zusammenfassung")
+                    st.write(f"Gesamtanzahl der Kunden: {len(results_df)}")
+                    st.dataframe(summary_df)
 
-                summary_df = pd.DataFrame(predictions_summary)
-                st.subheader("Zusammenfassung")
-                st.write(f"Gesamtanzahl der Kunden: {len(df)}")
-                st.dataframe(summary_df)
-
-                # CSV-Download-Option
-                csv = df.to_csv(index=False)
+                csv_output = results_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="Download Ergebnisse als CSV",
-                    data=csv,
+                    data=csv_output,
                     file_name="predictions_results.csv",
                     mime="text/csv",
                 )
-
         except Exception as e:
             st.error(f"Fehler bei der Verarbeitung der Datei: {e}")
+            st.exception(e) # Zeigt den kompletten Traceback für Debugging
 
 # Tab 3: Manueller Input
 with tab_manual:
     st.subheader("✍️ Manuelle Eingabe eines Beispiels")
 
+    # Verwende eine Schleife für die Service-Bewertungen, um Redundanz zu reduzieren
+    service_features_config = [
+        ('Departure and Arrival Time Convenience', "Abflugs- und Ankunftszeit", 4),
+        ('Ease of Online Booking', "Online-Buchung", 4),
+        ('Check-in Service', "Check-in Service", 4),
+        ('Online Boarding', "Online Boarding", 4),
+        ('Gate Location', "Gate-Lage", 4),
+        ('On-board Service', "Bordservice (allg.)", 4), # Geändert von "Bordservice"
+        ('Seat Comfort', "Sitzkomfort", 4),
+        ('Leg Room Service', "Beinfreiheit", 4),
+        ('Cleanliness', "Sauberkeit", 4),
+        ('Food and Drink', "Essen & Getränke", 4),
+        ('In-flight Service', "Bordservice während des Flugs", 4),
+        ('In-flight Wifi Service', "WLAN während des Flugs", 3),
+        ('In-flight Entertainment', "Unterhaltung während des Flugs", 4),
+        ('Baggage Handling', "Gepäckabfertigung", 4)
+    ]
+
     def user_input_features_manual():
-        """Funktion für die manuelle Eingabe aller Features"""
         col1, col2 = st.columns(2)
+        values_input = {} # Neuer Name, um Konflikte zu vermeiden
 
-        values = {}
-
-        # Spalte 1 - Demographische und Flugbezogene Daten
         with col1:
             st.subheader("📋 Grunddaten")
+            values_input['Age'] = st.slider("Alter", 18, 80, 35, key="manual_age_slider")
+            values_input['Flight Distance'] = st.slider("Flugdistanz (km)", 100, 5000, 1000, key="manual_flightdist_slider")
+            values_input['Gender_Male'] = 1 if st.selectbox("Geschlecht", ["Männlich", "Weiblich"], key="manual_gender_select") == "Männlich" else 0
+            values_input['Customer Type_Returning'] = 1 if st.selectbox("Kundentyp", ["Neu", "Wiederkehrend"], key="manual_custtype_select") == "Wiederkehrend" else 0
+            values_input['Type of Travel_Personal'] = 1 if st.selectbox("Reiseart", ["Geschäftlich", "Privat"], key="manual_traveltype_select") == "Privat" else 0
+            klasse = st.selectbox("Flugklasse", ["Economy", "Economy Plus", "Business"], key="manual_class_select")
+            values_input['Class_Economy'] = 1 if klasse == "Economy" else 0
+            values_input['Class_Economy Plus'] = 1 if klasse == "Economy Plus" else 0
+            values_input['Delay'] = st.slider("Verspätung (Minuten)", 0, 300, 10, key="manual_delay_slider")
 
-            values['Age'] = st.slider("Alter", 18, 80, 35)
-            values['Flight Distance'] = st.slider("Flugdistanz (km)", 100, 5000, 1000)
-            values['Gender_Male'] = 1 if st.selectbox("Geschlecht", ["Männlich", "Weiblich"]) == "Männlich" else 0
-            values['Customer Type_Returning'] = 1 if st.selectbox("Kundentyp", ["Neu", "Wiederkehrend"]) == "Wiederkehrend" else 0
-            values['Type of Travel_Personal'] = 1 if st.selectbox("Reiseart", ["Geschäftlich", "Privat"]) == "Privat" else 0
-
-            klasse = st.selectbox("Flugklasse", ["Economy", "Economy Plus", "Business"])
-            values['Class_Economy'] = 1 if klasse == "Economy" else 0
-            values['Class_Economy Plus'] = 1 if klasse == "Economy Plus" else 0
-
-            values['Delay'] = st.slider("Verspätung (Minuten)", 0, 300, 10)
-
-        # Spalte 2 - Service-bezogene Daten
         with col2:
-            st.subheader("⭐ Servicebewertungen")
-
-            values['Departure and Arrival Time Convenience'] = st.slider("Abflugs- und Ankunftszeit", 1, 5, 4)
-            values['Ease of Online Booking'] = st.slider("Online-Buchung", 1, 5, 4)
-            values['Check-in Service'] = st.slider("Check-in Service", 1, 5, 4)
-            values['Online Boarding'] = st.slider("Online Boarding", 1, 5, 4)
-            values['Gate Location'] = st.slider("Gate-Lage", 1, 5, 4)
-            values['On-board Service'] = st.slider("Bordservice", 1, 5, 4)
-            values['Seat Comfort'] = st.slider("Sitzkomfort", 1, 5, 4)
-            values['Leg Room Service'] = st.slider("Beinfreiheit", 1, 5, 4)
-            values['Cleanliness'] = st.slider("Sauberkeit", 1, 5, 4)
-            values['Food and Drink'] = st.slider("Essen & Getränke", 1, 5, 4)
-            values['In-flight Service'] = st.slider("Bordservice während des Flugs", 1, 5, 4)
-            values['In-flight Wifi Service'] = st.slider("WLAN während des Flugs", 1, 5, 3)
-            values['In-flight Entertainment'] = st.slider("Unterhaltung während des Flugs", 1, 5, 4)
-            values['Baggage Handling'] = st.slider("Gepäckabfertigung", 1, 5, 4)
-
-        return pd.DataFrame([values])
-
-    # Eingabeformular anzeigen
-    input_df = user_input_features_manual()
-
-    # Vorhersagen
-    scaled_input = models["scaler"].transform(input_df[feature_order])
-
-    pred_xgb = models["xgb"].predict(scaled_input)[0]
-    proba_xgb = models["xgb"].predict_proba(scaled_input)[0][1]
-
-    pred_rf = models["rf"].predict(scaled_input)[0]
-    proba_rf = models["rf"].predict_proba(scaled_input)[0][1]
-
-    pred_lgbm = models["lgbm"].predict(scaled_input)[0]
-    proba_lgbm = models["lgbm"].predict_proba(scaled_input)[0][1]
-
-    # Anzeige der Vorhersagen
-    st.markdown("### 🔍 Modellvorhersagen:")
-
-    cols = st.columns(3)
-    with cols[0]:
-        st.write(f"**XGBoost:** {'Zufrieden 😊' if pred_xgb == 1 else 'Unzufrieden 😠'}")
-        st.write(f"Wahrscheinlichkeit: {proba_xgb:.2%}")
-
-    with cols[1]:
-        st.write(f"**Random Forest:** {'Zufrieden 😊' if pred_rf == 1 else 'Unzufrieden 😠'}")
-        st.write(f"Wahrscheinlichkeit: {proba_rf:.2%}")
-
-    with cols[2]:
-        st.write(f"**LightGBM:** {'Zufrieden 😊' if pred_lgbm == 1 else 'Unzufrieden 😠'}")
-        st.write(f"Wahrscheinlichkeit: {proba_lgbm:.2%}")
-
-    # Funktion zur Visualisierung der Zufriedenheitswahrscheinlichkeit
-    def render_rocket_probability(prob, model_name):
-        """
-        Visualisiert die Zufriedenheitswahrscheinlichkeit mit einer aufsteigenden Rakete.
-        """
-        height = int(prob * 100)
-        stratosphere_level = 50
-        space_level = 90
-
-        if height >= space_level:
-            bg_color = "#000033"
-            atmosphere_text = "🌌 WELTRAUM"
-        elif height >= stratosphere_level:
-            bg_color = "#0066cc"
-            atmosphere_text = "🌤️ STRATOSPHÄRE"
-        else:
-            bg_color = "#87CEEB"
-            atmosphere_text = "☁️ TROPOSPHÄRE"
-
-        # Rakete-Flamme-Logik
-        rocket = "🚀"
-        flame = "🔥" if height < space_level else ""
-
-        # HTML-Block separat als kompletter Markdown
-        rocket_html = f"""
-            <div style="background-color: {bg_color}; padding: 10px; border-radius: 10px;
-                        color: white; text-align: center; min-height: 220px; position: relative;">
-                <h3 style="margin-bottom: 5px;">{model_name}: {prob:.2%}</h3>
-                <div style="position: absolute; top: 10px; right: 10px; font-size: 16px;
-                            background-color: rgba(255,255,255,0.2); padding: 5px; border-radius: 5px;">
-                    {atmosphere_text}
-                </div>
-                <div style="margin-top: {max(0, 100-height)}px; font-size: 36px;">
-                    {rocket}
-                </div>
-                <div style="font-size: 24px;">{flame}</div>
-                <div style="margin-top: 10px; border-top: 2px dashed white; position: relative;">
-                    <div style="position: absolute; left: 0; top: 5px; font-size: 12px;">0%</div>
-                    <div style="position: absolute; left: 50%; transform: translateX(-50%); top: 5px; font-size: 12px;">50%</div>
-                    <div style="position: absolute; right: 0; top: 5px; font-size: 12px;">100%</div>
-                </div>
-            </div>
-        """
-        return rocket_html
-
-    # Visuelle Darstellung der Wahrscheinlichkeiten
-    st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown(render_rocket_probability(proba_xgb, "XGBoost"), unsafe_allow_html=True)
-        if proba_xgb >= 0.5:
-            st.success(f"✅ XGBoost: Zufrieden ({proba_xgb:.2%})")
-        else:
-            st.warning(f"⚠️ XGBoost: Nicht zufrieden ({proba_xgb:.2%})")
-
-    with col2:
-        st.markdown(render_rocket_probability(proba_rf, "Random Forest"), unsafe_allow_html=True)
-        if proba_rf >= 0.5:
-            st.success(f"✅ Random Forest: Zufrieden ({proba_rf:.2%})")
-        else:
-            st.warning(f"⚠️ Random Forest: Nicht zufrieden ({proba_rf:.2%})")
-
-    with col3:
-        st.markdown(render_rocket_probability(proba_lgbm, "LightGBM"), unsafe_allow_html=True)
-        if proba_lgbm >= 0.5:
-            st.success(f"✅ LightGBM: Zufrieden ({proba_lgbm:.2%})")
-        else:
-            st.warning(f"⚠️ LightGBM: Nicht zufrieden ({proba_lgbm:.2%})")
+            st.subheader("⭐ Servicebewertungen (1=schlecht, 5=exzellent)")
+            for feat_key, display_name, default_val in service_features_config:
+                values_input[feat_key] = st.slider(display_name, 1, 5, default_val, key=f"manual_slider_{feat_key.replace(' ', '_')}")
+        
+        # DataFrame mit der korrekten Feature-Reihenfolge erstellen
+        return pd.DataFrame([values_input])[feature_order]
 
 
-    # Empfehlungen zur Verbesserung der Zufriedenheit
-    st.markdown("---")
-    st.subheader("💡 Empfehlungen zur Verbesserung der Zufriedenheit")
+    input_df_manual = user_input_features_manual() # Neuer Variablenname
 
-    # Durchschnittliche Zufriedenheitswahrscheinlichkeit
-    avg_prob = (proba_xgb + proba_rf + proba_lgbm) / 3
-
-    # Merkmalsauswahl für Empfehlungen
-    relevant_features = {k: v for k, v in input_df.iloc[0].items() if k in [
-        "Online Boarding", "Type of Travel_Personal", "In-flight Wifi Service",
-        "In-flight Entertainment", "Class_Economy", "Seat Comfort", "Customer Type_Returning",
-        "Leg Room Service", "On-board Service", "Flight Distance", "Cleanliness",
-        "Baggage Handling", "Age", "In-flight Service", "Check-in Service",
-        "Ease of Online Booking", "Departure and Arrival Time Convenience",
-        "Gate Location", "Food and Drink", "Delay"
-    ]}
-
-    with st.spinner("Generiere Empfehlungen basierend auf deinen Eingaben..."):
-        try:
-            recommendation = generate_action_recommendations(relevant_features)
-            st.success("✅ Empfehlungen erfolgreich generiert:")
-            st.markdown(recommendation)
-        except Exception as e:
-            st.error(f"Fehler bei der Generierung: {e}")
-
-    # Zusammenfassung
-    st.markdown("---")
-    st.markdown(f"### 📊 Gesamtbewertung")
-    st.markdown(f"**Durchschnittliche Zufriedenheitswahrscheinlichkeit: {avg_prob:.2%}**")
-
-    if avg_prob >= 0.7:
-        st.success("✅ Der Kunde wird höchstwahrscheinlich sehr zufrieden sein!")
-    elif avg_prob >= 0.5:
-        st.success("✅ Der Kunde wird wahrscheinlich zufrieden sein.")
-    elif avg_prob >= 0.4:
-        st.info("ℹ️ Der Kunde könnte zufrieden sein, aber es besteht Verbesserungspotential.")
+    if models is None or "scaler" not in models or models["scaler"] is None:
+        st.error("Scaler-Modell nicht geladen. Manuelle Vorhersage nicht möglich.")
     else:
-        st.error("❌ Der Kunde wird wahrscheinlich unzufrieden sein. Massnahmen sollten ergriffen werden!")
+        scaled_input_manual = models["scaler"].transform(input_df_manual) # Neuer Variablenname
+
+        predictions_manual = {} # Neuer Variablenname
+        proba_values = []
+
+        for model_key in ["xgb", "rf", "lgbm"]:
+            if model_key in models and models[model_key] is not None:
+                model_instance = models[model_key]
+                pred = model_instance.predict(scaled_input_manual)[0]
+                proba = model_instance.predict_proba(scaled_input_manual)[0][1]
+                predictions_manual[model_key] = {"pred": pred, "proba": proba}
+                proba_values.append(proba)
+            else:
+                st.warning(f"{model_key.upper()}-Modell nicht geladen. Keine Vorhersage möglich.")
+                predictions_manual[model_key] = {"pred": 0, "proba": 0.0} # Fallback
+                proba_values.append(0.0)
+
+
+        st.markdown("### 🔍 Modellvorhersagen:")
+        pred_cols = st.columns(len(predictions_manual) if predictions_manual else 1) # Neuer Variablenname
+        
+        idx = 0
+        for model_key_iter, result in predictions_manual.items(): # Klare Iterationsvariablen
+            with pred_cols[idx]:
+                st.write(f"**{model_key_iter.upper()}:** {'Zufrieden 😊' if result['pred'] == 1 else 'Unzufrieden 😠'}")
+                st.write(f"Wahrscheinlichkeit: {result['proba']:.2%}")
+            idx += 1
+        
+        def render_rocket_probability(prob, model_name_render): # Neuer Variablenname
+            height = int(prob * 100)
+            stratosphere_level = 50; space_level = 90 # Semikolon für gleiche Zeile ist ok
+            bg_color = "#000033" if height >= space_level else ("#0066cc" if height >= stratosphere_level else "#87CEEB")
+            atmosphere_text = "🌌 WELTRAUM" if height >= space_level else ("🌤️ STRATOSPHÄRE" if height >= stratosphere_level else "☁️ TROPOSPHÄRE")
+            rocket = "🚀"; flame = "🔥" if height < space_level else "" # Semikolon für gleiche Zeile ist ok
+            return f"""<div style="background-color:{bg_color};padding:10px;border-radius:10px;color:white;text-align:center;min-height:220px;position:relative; margin-bottom:10px;">
+                        <h3 style="margin-bottom:5px;">{model_name_render}: {prob:.2%}</h3>
+                        <div style="position:absolute;top:10px;right:10px;font-size:16px;background-color:rgba(255,255,255,0.2);padding:5px;border-radius:5px;">{atmosphere_text}</div>
+                        <div style="margin-top:{max(0,100-height)}px;font-size:36px;">{rocket}</div><div style="font-size:24px;">{flame}</div>
+                        <div style="margin-top:10px;border-top:2px dashed white;position:relative;"><div style="position:absolute;left:0;top:5px;font-size:12px;">0%</div>
+                        <div style="position:absolute;left:50%;transform:translateX(-50%);top:5px;font-size:12px;">50%</div>
+                        <div style="position:absolute;right:0;top:5px;font-size:12px;">100%</div></div></div>"""
+
+        st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit")
+        rocket_cols_display = st.columns(len(predictions_manual) if predictions_manual else 1) # Neuer Variablenname
+        
+        idx = 0
+        for model_key_iter, result in predictions_manual.items(): # Klare Iterationsvariablen
+            with rocket_cols_display[idx]:
+                st.markdown(render_rocket_probability(result['proba'], model_key_iter.upper()), unsafe_allow_html=True)
+                if result['pred'] == 1: # Einfachere Bedingung
+                    st.success(f"✅ {model_key_iter.upper()}: Zufrieden ({result['proba']:.2%})")
+                else:
+                    st.warning(f"⚠️ {model_key_iter.upper()}: Eher unzufrieden ({result['proba']:.2%})")
+            idx +=1
+        
+        st.markdown("---")
+        st.subheader("💡 Empfehlungen zur Verbesserung der Zufriedenheit")
+        
+        avg_prob_manual = np.mean(proba_values) if proba_values else 0.0 # Neuer Variablenname
+
+        # Stelle sicher, dass input_df_manual die Spalte 'Delay' und andere erwartete Spalten hat
+        # Dies wird durch die Erstellung in user_input_features_manual mit feature_order sichergestellt.
+        relevant_features_for_llm = {k: v for k, v in input_df_manual.iloc[0].to_dict().items() if k in feature_order}
+
+        with st.spinner("Generiere Empfehlungen basierend auf deinen Eingaben..."):
+            try:
+                recommendation = generate_action_recommendations(relevant_features_for_llm)
+                st.success("✅ Empfehlungen erfolgreich generiert:")
+                st.markdown(recommendation)
+            except Exception as e:
+                st.error(f"Fehler bei der Generierung der Empfehlungen: {e}")
+                st.exception(e)
+
+        st.markdown("---")
+        st.markdown(f"### 📊 Gesamtbewertung")
+        st.markdown(f"**Durchschnittliche Zufriedenheitswahrscheinlichkeit (aller Modelle): {avg_prob_manual:.2%}**")
+        if avg_prob_manual >= 0.7: st.success("✅ Der Kunde wird höchstwahrscheinlich sehr zufrieden sein!")
+        elif avg_prob_manual >= 0.5: st.success("✅ Der Kunde wird wahrscheinlich zufrieden sein.")
+        elif avg_prob_manual >= 0.4: st.info("ℹ️ Der Kunde könnte zufrieden sein, aber es besteht Verbesserungspotential.")
+        else: st.error("❌ Der Kunde wird wahrscheinlich unzufrieden sein. Massnahmen sollten ergriffen werden!")
