@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import seaborn as sns
 import lightgbm as lgb
 import shap
@@ -108,22 +109,67 @@ st.title("✈️ Airline Satisfaction Prediction & Insights App")
 tab1, tab2, tab3 = st.tabs(["📊 Feature Insights & Segmente", "📤 CSV Upload & Predict", "✍️ Manueller Input & Erklärung"])
 
 # Tab 1: Feature Insights & Segmentbasierte Analyse
+# Tab 1: Feature Insights & Segmentbasierte Analyse
+# Tab 1: Feature Insights & Segmentbasierte Analyse
+# Tab 1: Feature Insights & Segmentbasierte Analyse
+# Tab 1: Feature Insights & Segmentbasierte Analyse
 with tab1:
     st.header("🎯 Globale Feature Importances")
     
-    # Feature Importances für alle Modelle
+    # Feature Importances für alle Modelle mit unterschiedlichen Farbpaletten
     models_to_display = {
-        "XGBoost": (models["xgb"], "steelblue"),
-        "Random Forest": (models["rf"], "darkgreen"),
-        "LightGBM": (models["lgbm"], "darkorange")
+        "XGBoost": (models["xgb"], cm.viridis, "Viridis"),
+        "Random Forest": (models["rf"], cm.plasma, "Plasma"),
+        "LightGBM": (models["lgbm"], cm.coolwarm, "Blau-Rot Gradient")
     }
     
-    for model_name, (model, color) in models_to_display.items():
-        st.subheader(model_name)
-        importance = pd.Series(model.feature_importances_, index=feature_order).sort_values(ascending=True)
+    for model_name, (model, color_palette, palette_name) in models_to_display.items():
+        st.subheader(f"{model_name}")
+        
+        # Feature Importances extrahieren und sortieren
+        raw_importance = pd.Series(model.feature_importances_, index=feature_order)
+        
+        # Normalisieren, sodass die Summe 1 ergibt (einheitliche Skala für alle Modelle)
+        importance = raw_importance / raw_importance.sum()
+        importance = importance.sort_values(ascending=False)  # Sortieren mit höchsten Werten zuerst
+        
+        # Normalisiere die Werte für Farben zwischen 0 und 1
+        norm_values = (importance - importance.min()) / (importance.max() - importance.min())
+        
+        # Erstelle Farben basierend auf der zugewiesenen Palette
+        colors = [color_palette(val) for val in norm_values]
+        
+        # Plot erstellen
         fig, ax = plt.subplots(figsize=(10, 6))
-        importance.plot(kind='barh', ax=ax, color=color)
-        ax.set_title(f"Top Features - {model_name}")
+        
+        # Nur die Top 10 Features anzeigen (für bessere Lesbarkeit)
+        top_n = min(10, len(importance))
+        top_importance = importance.iloc[:top_n]
+        top_colors = colors[:top_n]
+        
+        # Umgekehrte Reihenfolge für die Y-Achse (höchster Wert oben)
+        y_pos = range(len(top_importance))
+        
+        # Horizontale Balken mit individuellen Farben in umgekehrter Reihenfolge
+        bars = ax.barh(y_pos, top_importance.values, color=top_colors)
+        
+        # Setze die Y-Ticks auf die Feature-Namen in umgekehrter Reihenfolge
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(top_importance.index)
+        
+        # Titel und Layout
+        ax.set_title(f"Top {top_n} Features - {model_name} (Normalisiert)")
+        ax.set_xlabel("Normalisierte Feature Importance")
+        
+        # X-Achse als Prozentsatz formatieren
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.1%}'.format(x)))
+        
+        # Einheitlicher X-Achsenbereich für alle Diagramme
+        ax.set_xlim(0, top_importance.iloc[0] * 1.1)  # Maximalwert + 10% Puffer
+        
+        plt.tight_layout()
+        
+        # Plot anzeigen
         st.pyplot(fig)
     
     st.markdown("---")
