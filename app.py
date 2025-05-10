@@ -250,7 +250,7 @@ with tab1:
         
         # Option für SHAP Beeswarm Plot
         if st.checkbox("Zeige SHAP Beeswarm Plot (detailliertere Ansicht)"):
-            st.warning("Diese Visualisierung kann bei großen Segmenten länger dauern.")
+            st.warning("Diese Visualisierung kann bei grossen Segmenten länger dauern.")
             
             # Wähle eine Stichprobe, wenn zu viele Datenpunkte
             max_display = min(num_samples, 500)
@@ -532,4 +532,4 @@ with tab3:
     elif avg_prob >= 0.4:
         st.info("ℹ️ Der Kunde könnte zufrieden sein, aber es besteht Verbesserungspotential.")
     else:
-        st.error("❌ Der Kunde wird wahrscheinlich unzufrieden sein. Maßnahmen sollten ergriffen werden!")
+        st.error("❌ Der Kunde wird wahrscheinlich unzufrieden sein. Massnahmen sollten ergriffen werden!")
