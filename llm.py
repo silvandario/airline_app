@@ -11,6 +11,7 @@ def generate_action_recommendations(user_features: dict) -> str:
 Ein Kunde hat kürzlich eine Flugreise gemacht. Basierend auf den folgenden Bewertungsmerkmalen
 (1 bis 5, wobei 5 das Beste ist), sollst du Empfehlungen geben, wie die Zufriedenheit
 verbessert werden kann. Konzentriere dich auf die wichtigsten Faktoren laut ML-Modell:
+Mit absteigender Wichtigkeit:
 
 Hier sind die Eingaben des Kunden:
 """
