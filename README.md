@@ -1,6 +1,6 @@
 (Written by ChatGPT)
 
-# ✈️ Airline Satisfaction Prediction App
+# ✈️ Super Airline Satisfaction Prediction App
 
 A powerful and interactive **Streamlit dashboard** to predict airline passenger satisfaction using **XGBoost** and **Random Forest**, with visual insights and segment analysis.
 
