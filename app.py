@@ -75,48 +75,16 @@ with st.sidebar:
         "Dieses Dashboard bietet Einblicke in die Zufriedenheit von Flugreisenden und ermöglicht Vorhersagen basierend auf verschiedenen Modellen."
     )
     
+    # GPT-Model Selector im Sidebar
     st.markdown("---")
-    st.subheader("Segmentfilter")
-    
-    # Segment-Filter für die SHAP-basierte Analyse
-    segment_class = st.selectbox(
-        "Flugklasse", 
-        ["Alle", "Economy", "Economy Plus", "Business"],
-        key="sidebar_class"
-    )
-    
-    segment_age_range = st.slider(
-        "Altersbereich", 
-        min_value=18, 
-        max_value=85, 
-        value=(25, 60),
-        key="sidebar_age"
-    )
-    
-    segment_travel_type = st.selectbox(
-        "Reisetyp", 
-        ["Alle", "Geschäftlich", "Privat"],
-        key="sidebar_travel"
-    )
-    
-    segment_customer_type = st.selectbox(
-        "Kundentyp", 
-        ["Alle", "Neu", "Wiederkehrend"],
-        key="sidebar_customer"
-    )
-    
-    segment_gender = st.selectbox(
-        "Geschlecht", 
-        ["Alle", "Männlich", "Weiblich"],
-        key="sidebar_gender"
-    )
-    
-    segment_distance_range = st.slider(
-        "Flugdistanz (km)", 
-        min_value=0, 
-        max_value=5000, 
-        value=(0, 5000),
-        key="sidebar_distance"
+    if "openai_model" not in st.session_state:
+        st.session_state["openai_model"] = "gpt-3.5-turbo"
+        
+    st.selectbox(
+        "Welches GPT-Modell verwenden?",
+        options=["gpt-3.5-turbo", "gpt-4"],
+        index=0 if st.session_state["openai_model"] == "gpt-3.5-turbo" else 1,
+        key="openai_model"
     )
 
 # Hintergrundbild
@@ -164,8 +132,56 @@ with tab1:
     st.header("🔍 SHAP-basierte Segmentanalyse")
     st.write("""
     Diese Analyse zeigt, welche Faktoren die Zufriedenheit für spezifische Kundensegmente am stärksten beeinflussen.
-    Nutzen Sie die Filter in der Seitenleiste, um ein bestimmtes Segment zu definieren.
+    Nutzen Sie die Filter unten, um ein bestimmtes Segment zu definieren.
     """)
+    
+    # Segment-Filter direkt unter SHAP-basierte Segmentanalyse
+    st.subheader("🎯 Segmentfilter")
+    
+    # Erstellen von zwei Spalten für übersichtlichere Filter-Anordnung
+    filter_col1, filter_col2 = st.columns(2)
+    
+    with filter_col1:
+        segment_class = st.selectbox(
+            "Flugklasse", 
+            ["Alle", "Economy", "Economy Plus", "Business"],
+            key="filter_class"
+        )
+        
+        segment_age_range = st.slider(
+            "Altersbereich", 
+            min_value=18, 
+            max_value=85, 
+            value=(25, 60),
+            key="filter_age"
+        )
+        
+        segment_travel_type = st.selectbox(
+            "Reisetyp", 
+            ["Alle", "Geschäftlich", "Privat"],
+            key="filter_travel"
+        )
+    
+    with filter_col2:
+        segment_customer_type = st.selectbox(
+            "Kundentyp", 
+            ["Alle", "Neu", "Wiederkehrend"],
+            key="filter_customer"
+        )
+        
+        segment_gender = st.selectbox(
+            "Geschlecht", 
+            ["Alle", "Männlich", "Weiblich"],
+            key="filter_gender"
+        )
+        
+        segment_distance_range = st.slider(
+            "Flugdistanz (km)", 
+            min_value=0, 
+            max_value=5000, 
+            value=(0, 5000),
+            key="filter_distance"
+        )
     
     # Filtere die Daten basierend auf den Segment-Filtern
     segment_mask = pd.Series(True, index=X_train_df.index)
@@ -332,19 +348,6 @@ with tab2:
         except Exception as e:
             st.error(f"Fehler bei der Verarbeitung der Datei: {e}")
 
-# GPT-Model Selector
-if "openai_model" not in st.session_state:
-    st.session_state["openai_model"] = "gpt-3.5-turbo"
-
-with st.sidebar:
-    st.markdown("---")
-    st.selectbox(
-        "Welches GPT-Modell verwenden?",
-        options=["gpt-3.5-turbo", "gpt-4"],
-        index=0 if st.session_state["openai_model"] == "gpt-3.5-turbo" else 1,
-        key="openai_model"
-    )
-
 # Tab 3: Manueller Input
 with tab3:
     st.subheader("✍️ Manuelle Eingabe eines Beispiels")
@@ -495,7 +498,7 @@ with tab3:
             st.warning(f"⚠️ LightGBM: Nicht zufrieden ({proba_lgbm:.2%})")
     
     
-    # Empfehlungen zur Verbesserung der Zufriedenheit dddddd
+    # Empfehlungen zur Verbesserung der Zufriedenheit
     st.markdown("---")
     st.subheader("💡 Empfehlungen zur Verbesserung der Zufriedenheit")
     
