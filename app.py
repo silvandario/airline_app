@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -56,7 +58,7 @@ models = None
 X_train_df = pd.DataFrame(columns=fallback_feature_order)
 shap_values_df = pd.DataFrame(columns=fallback_feature_order)
 feature_order = fallback_feature_order
-explainer = None
+explainer = None # explainer wird hier nicht mehr benötigt, da keine individuelle SHAP Plots mehr da sind
 
 
 try:
@@ -64,14 +66,13 @@ try:
     X_train_df, shap_values_df = load_shap_data_assets()
     if not X_train_df.empty:
         feature_order = list(X_train_df.columns)
-    else: # Sollte nicht passieren, wenn load_shap_data_assets erfolgreich ist
+    else: 
         feature_order = fallback_feature_order
 
 except Exception as e:
     st.error(f"Fehler beim Laden der Modelle oder Daten: {e}")
-    # Beibehaltung der Fallback-Werte
     feature_order = fallback_feature_order
-    models = {} # Leeres Dict, um KeyErrors später zu vermeiden
+    models = {} 
     X_train_df = pd.DataFrame(columns=feature_order)
     shap_values_df = pd.DataFrame(columns=feature_order)
 
@@ -127,7 +128,6 @@ tab_insights, tab_upload, tab_manual = st.tabs(["📊 Feature Insights", "📤 C
 with tab_insights:
     st.header("📊 Feature Insights")
 
-    # Slider für die Anzahl der Top-Features
     max_features_for_slider = len(feature_order) if feature_order else 20
     num_features_to_display = st.slider(
         "Anzahl der Top-Features für Diagramme auswählen:",
@@ -140,38 +140,31 @@ with tab_insights:
     sub_tab1_global, sub_tab1_segments = st.tabs(["🎯 Globale Feature Importances", "🔍 Segmente"])
 
     with sub_tab1_global:
-        # ... (Code für globale Feature Importances bleibt unverändert) ...
         st.header("🎯 Globale Feature Importances")
-
         if models: 
             models_to_display = {
                 "XGBoost": (models.get("xgb"), cm.viridis, "Viridis"),
                 "Random Forest": (models.get("rf"), cm.plasma, "Plasma"),
                 "LightGBM": (models.get("lgbm"), cm.coolwarm, "Blau-Rot Gradient")
             }
-
             for model_name, (model, color_palette, palette_name) in models_to_display.items():
                 st.subheader(f"{model_name}")
                 if model is None or not hasattr(model, 'feature_importances_'):
                     st.write(f"Modell {model_name} nicht verfügbar oder hat keine Feature Importances.")
                     continue
-
                 raw_importance = pd.Series(model.feature_importances_, index=feature_order)
                 if raw_importance.sum() == 0: 
                     importance = raw_importance
                 else:
                     importance = raw_importance / raw_importance.sum()
                 importance = importance.sort_values(ascending=False)
-
                 if importance.empty:
                     st.write("Keine Feature Importances für dieses Modell zu visualisieren.")
                     continue
-                
                 if (importance.max() - importance.min()) == 0:
                     norm_values = pd.Series(0.5, index=importance.index) 
                 else:
                     norm_values = (importance - importance.min()) / (importance.max() - importance.min())
-                
                 colors = [color_palette(val) for val in norm_values]
                 fig, ax = plt.subplots(figsize=(10, 6))
                 current_top_n_global = min(num_features_to_display, len(importance))
@@ -195,17 +188,14 @@ with tab_insights:
             st.warning("Modelle wurden nicht geladen. Feature Importances können nicht angezeigt werden.")
         st.markdown("---")
 
-
     with sub_tab1_segments:
         st.header("🔍 SHAP-basierte Segmentanalyse")
         st.write("""
         Diese Analyse zeigt, welche Faktoren die Zufriedenheit für spezifische Kundensegmente am stärksten beeinflussen.
         Nutzen Sie die Filter unten, um ein bestimmtes Segment zu definieren.
         """)
-
         st.subheader("🎯 Segmentfilter")
         filter_col1, filter_col2 = st.columns(2)
-
         with filter_col1:
             segment_class = st.selectbox(
                 "Flugklasse", ["Alle", "Economy", "Economy Plus", "Business"], key="filter_class"
@@ -243,8 +233,6 @@ with tab_insights:
                 if segment_class == "Economy": segment_mask &= (X_train_df['Class_Economy'] == 1)
                 elif segment_class == "Economy Plus": segment_mask &= (X_train_df['Class_Economy Plus'] == 1)
                 else: segment_mask &= ((X_train_df['Class_Economy'] == 0) & (X_train_df['Class_Economy Plus'] == 0))
-            
-            # Überprüfe, ob Spalten existieren, bevor gefiltert wird
             if 'Age' in X_train_df.columns:
                 segment_mask &= (X_train_df['Age'] >= segment_age_range[0]) & (X_train_df['Age'] <= segment_age_range[1])
             if 'Type of Travel_Personal' in X_train_df.columns and segment_travel_type != "Alle":
@@ -256,9 +244,8 @@ with tab_insights:
             if 'Flight Distance' in X_train_df.columns:
                 segment_mask &= (X_train_df['Flight Distance'] >= segment_distance_range[0]) & (X_train_df['Flight Distance'] <= segment_distance_range[1])
 
-
             filtered_df = X_train_df[segment_mask]
-            filtered_shap = shap_values_df.loc[segment_mask] # .loc verwenden für konsistentes Verhalten
+            filtered_shap = shap_values_df.loc[segment_mask] 
             num_samples = len(filtered_df)
             st.write(f"Anzahl der Datenpunkte im ausgewählten Segment: **{num_samples}**")
 
@@ -266,20 +253,17 @@ with tab_insights:
                 mean_abs_shap = filtered_shap.abs().mean().sort_values(ascending=False)
                 mean_shap_for_tendency = filtered_shap.mean().reindex(mean_abs_shap.index)
                 current_top_n_shap = min(num_features_to_display, len(mean_abs_shap))
-
                 st.subheader(f"Top {current_top_n_shap} Einflussfaktoren für dieses Segment")
                 influence_df = pd.DataFrame({
                     'Feature': mean_abs_shap.index[:current_top_n_shap],
                     'Einfluss-Stärke': mean_abs_shap.values[:current_top_n_shap],
                     'Tendenz': ["Positiv ✅" if val > 0 else ("Negativ ❌" if val < 0 else "Neutral ➖") for val in mean_shap_for_tendency.loc[mean_abs_shap.index[:current_top_n_shap]].values]
                 })
-                st.dataframe(influence_df.style.format({"Einfluss-Stärke": "{:.2f}"})) # Formatierung für bessere Lesbarkeit
-
+                st.dataframe(influence_df.style.format({"Einfluss-Stärke": "{:.2f}"}))
                 st.subheader("SHAP Summary Plot (Bar)")
                 fig_bar_shap, ax_bar_shap = plt.subplots(figsize=(10, max(6, current_top_n_shap * 0.5)))
                 sorted_idx = mean_abs_shap.index[:current_top_n_shap][::-1]
                 bar_colors = ['green' if mean_shap_for_tendency[feat] > 0 else ('red' if mean_shap_for_tendency[feat] < 0 else 'grey') for feat in sorted_idx]
-                
                 ax_bar_shap.barh(range(len(sorted_idx)), mean_abs_shap[sorted_idx].values, color=bar_colors)
                 ax_bar_shap.set_yticks(range(len(sorted_idx)))
                 ax_bar_shap.set_yticklabels(sorted_idx)
@@ -300,11 +284,8 @@ with tab_insights:
                     st.warning("Diese Visualisierung kann bei grossen Segmenten länger dauern.")
                     max_display_beeswarm = min(num_samples, 500)
                     sample_indices = np.random.choice(filtered_df.index, size=max_display_beeswarm, replace=False) if num_samples > max_display_beeswarm else filtered_df.index
-                    
-                    # Sicherstellen, dass die Spalten für SHAP Plot übereinstimmen
                     shap_values_for_plot = filtered_shap.loc[sample_indices, feature_order].values
                     feature_values_for_plot = filtered_df.loc[sample_indices, feature_order]
-
                     fig_beeswarm, ax_beeswarm = plt.subplots()
                     shap.summary_plot(
                         shap_values_for_plot,
@@ -317,14 +298,12 @@ with tab_insights:
                     st.pyplot(fig_beeswarm)
                     plt.close(fig_beeswarm)
                 
-                # ----- Integration der LLM-Analyse für Segmente -----
                 st.markdown("---")
                 st.subheader("🤖 KI-basierte Analyse und Handlungsempfehlungen für dieses Segment")
                 if st.button("Segment analysieren und Empfehlungen generieren", key="analyze_segment_llm_button"):
                     if not influence_df.empty:
                         with st.spinner("Generiere Handlungsempfehlungen für das Segment basierend auf SHAP-Analyse..."):
                             try:
-                                # influence_df enthält bereits die Top N Features für das Segment
                                 recommendations_segment = generate_segment_recommendations_from_shap(influence_df)
                                 st.success("✅ Empfehlungen erfolgreich generiert:")
                                 st.markdown(recommendations_segment)
@@ -340,49 +319,34 @@ with tab_insights:
 with tab_upload:
     st.header("📤 Daten hochladen und Vorhersagen treffen")
     uploaded_file = st.file_uploader("Lade eine CSV-Datei hoch", type=["csv"])
-
     if uploaded_file:
         try:
-            df_upload = pd.read_csv(uploaded_file) # Neuer Variablenname, um Konflikte zu vermeiden
-
-            # Überprüfen, ob alle Feature-Order-Spalten in df_upload vorhanden sind
-            # und ob der Scaler und die Modelle geladen sind
+            df_upload = pd.read_csv(uploaded_file) 
             if not set(feature_order).issubset(df_upload.columns):
                 missing_cols = set(feature_order) - set(df_upload.columns)
                 st.error(f"Die CSV-Datei enthält nicht alle benötigten Spalten. Fehlende Spalten: {', '.join(missing_cols)}")
             elif models is None or "scaler" not in models or models["scaler"] is None:
                 st.error("Scaler-Modell nicht geladen. Vorhersage nicht möglich.")
             else:
-                # Nur die benötigten Spalten in der richtigen Reihenfolge auswählen
                 df_for_scaling = df_upload[feature_order].copy()
-                
-                # Einfache Imputation für fehlende Werte (z.B. mit 0) - Anpassen falls nötig!
                 for col in df_for_scaling.columns:
                     if df_for_scaling[col].isnull().any():
                         st.warning(f"Spalte '{col}' in den hochgeladenen Daten enthält fehlende Werte. Diese werden mit 0 ersetzt.")
                         df_for_scaling[col] = df_for_scaling[col].fillna(0)
-
                 df_scaled = models["scaler"].transform(df_for_scaling)
-                
-                # Kopie des Original-DataFrames für die Ausgabe der Ergebnisse
                 results_df = df_upload.copy()
-
                 for model_key in ["xgb", "rf", "lgbm"]:
                     if model_key in models and models[model_key] is not None:
                         model_instance = models[model_key]
                         pred_col_name = f"{model_key.upper()} Prediction"
                         prob_col_name = f"{model_key.upper()} Prob (Zufrieden)"
-                        
                         results_df[pred_col_name] = model_instance.predict(df_scaled)
-                        results_df[prob_col_name] = model_instance.predict_proba(df_scaled)[:, 1] # Wahrsch. für Klasse 1
+                        results_df[prob_col_name] = model_instance.predict_proba(df_scaled)[:, 1] 
                     else:
                         st.warning(f"{model_key.upper()}-Modell nicht geladen. Keine Vorhersage möglich.")
-
-
                 st.success("✅ Vorhersage erfolgreich durchgeführt!")
                 st.subheader("Vorhersageergebnisse")
                 st.dataframe(results_df)
-
                 predictions_summary_list = []
                 for model_key in ["xgb", "rf", "lgbm"]:
                     pred_col = f"{model_key.upper()} Prediction"
@@ -395,13 +359,11 @@ with tab_upload:
                             "Zufriedene Kunden": num_satisfied,
                             "Zufriedenheitsrate": f"{satisfaction_rate_val:.2f}%"
                         })
-                
                 if predictions_summary_list:
                     summary_df = pd.DataFrame(predictions_summary_list)
                     st.subheader("Zusammenfassung")
                     st.write(f"Gesamtanzahl der Kunden: {len(results_df)}")
                     st.dataframe(summary_df)
-
                 csv_output = results_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="Download Ergebnisse als CSV",
@@ -411,20 +373,19 @@ with tab_upload:
                 )
         except Exception as e:
             st.error(f"Fehler bei der Verarbeitung der Datei: {e}")
-            st.exception(e) # Zeigt den kompletten Traceback für Debugging
+            st.exception(e) 
 
 # Tab 3: Manueller Input
 with tab_manual:
     st.subheader("✍️ Manuelle Eingabe eines Beispiels")
 
-    # Verwende eine Schleife für die Service-Bewertungen, um Redundanz zu reduzieren
     service_features_config = [
         ('Departure and Arrival Time Convenience', "Abflugs- und Ankunftszeit", 4),
         ('Ease of Online Booking', "Online-Buchung", 4),
         ('Check-in Service', "Check-in Service", 4),
         ('Online Boarding', "Online Boarding", 4),
         ('Gate Location', "Gate-Lage", 4),
-        ('On-board Service', "Bordservice (allg.)", 4), # Geändert von "Bordservice"
+        ('On-board Service', "Bordservice (allg.)", 4), 
         ('Seat Comfort', "Sitzkomfort", 4),
         ('Leg Room Service', "Beinfreiheit", 4),
         ('Cleanliness', "Sauberkeit", 4),
@@ -437,8 +398,7 @@ with tab_manual:
 
     def user_input_features_manual():
         col1, col2 = st.columns(2)
-        values_input = {} # Neuer Name, um Konflikte zu vermeiden
-
+        values_input = {} 
         with col1:
             st.subheader("📋 Grunddaten")
             values_input['Age'] = st.slider("Alter", 18, 80, 35, key="manual_age_slider")
@@ -450,24 +410,19 @@ with tab_manual:
             values_input['Class_Economy'] = 1 if klasse == "Economy" else 0
             values_input['Class_Economy Plus'] = 1 if klasse == "Economy Plus" else 0
             values_input['Delay'] = st.slider("Verspätung (Minuten)", 0, 300, 10, key="manual_delay_slider")
-
         with col2:
             st.subheader("⭐ Servicebewertungen (1=schlecht, 5=exzellent)")
             for feat_key, display_name, default_val in service_features_config:
                 values_input[feat_key] = st.slider(display_name, 1, 5, default_val, key=f"manual_slider_{feat_key.replace(' ', '_')}")
-        
-        # DataFrame mit der korrekten Feature-Reihenfolge erstellen
         return pd.DataFrame([values_input])[feature_order]
 
-
-    input_df_manual = user_input_features_manual() # Neuer Variablenname
+    input_df_manual = user_input_features_manual() 
 
     if models is None or "scaler" not in models or models["scaler"] is None:
         st.error("Scaler-Modell nicht geladen. Manuelle Vorhersage nicht möglich.")
     else:
-        scaled_input_manual = models["scaler"].transform(input_df_manual) # Neuer Variablenname
-
-        predictions_manual = {} # Neuer Variablenname
+        scaled_input_manual = models["scaler"].transform(input_df_manual) 
+        predictions_manual = {} 
         proba_values = []
 
         for model_key in ["xgb", "rf", "lgbm"]:
@@ -479,26 +434,24 @@ with tab_manual:
                 proba_values.append(proba)
             else:
                 st.warning(f"{model_key.upper()}-Modell nicht geladen. Keine Vorhersage möglich.")
-                predictions_manual[model_key] = {"pred": 0, "proba": 0.0} # Fallback
+                predictions_manual[model_key] = {"pred": 0, "proba": 0.0} 
                 proba_values.append(0.0)
 
-
         st.markdown("### 🔍 Modellvorhersagen:")
-        pred_cols = st.columns(len(predictions_manual) if predictions_manual else 1) # Neuer Variablenname
-        
+        pred_cols = st.columns(len(predictions_manual) if predictions_manual else 1) 
         idx = 0
-        for model_key_iter, result in predictions_manual.items(): # Klare Iterationsvariablen
+        for model_key_iter, result in predictions_manual.items(): 
             with pred_cols[idx]:
                 st.write(f"**{model_key_iter.upper()}:** {'Zufrieden 😊' if result['pred'] == 1 else 'Unzufrieden 😠'}")
                 st.write(f"Wahrscheinlichkeit: {result['proba']:.2%}")
             idx += 1
         
-        def render_rocket_probability(prob, model_name_render): # Neuer Variablenname
+        def render_rocket_probability(prob, model_name_render): 
             height = int(prob * 100)
-            stratosphere_level = 50; space_level = 90 # Semikolon für gleiche Zeile ist ok
+            stratosphere_level = 50; space_level = 90 
             bg_color = "#000033" if height >= space_level else ("#0066cc" if height >= stratosphere_level else "#87CEEB")
             atmosphere_text = "🌌 WELTRAUM" if height >= space_level else ("🌤️ STRATOSPHÄRE" if height >= stratosphere_level else "☁️ TROPOSPHÄRE")
-            rocket = "🚀"; flame = "🔥" if height < space_level else "" # Semikolon für gleiche Zeile ist ok
+            rocket = "🚀"; flame = "🔥" if height < space_level else "" 
             return f"""<div style="background-color:{bg_color};padding:10px;border-radius:10px;color:white;text-align:center;min-height:220px;position:relative; margin-bottom:10px;">
                         <h3 style="margin-bottom:5px;">{model_name_render}: {prob:.2%}</h3>
                         <div style="position:absolute;top:10px;right:10px;font-size:16px;background-color:rgba(255,255,255,0.2);padding:5px;border-radius:5px;">{atmosphere_text}</div>
@@ -508,13 +461,12 @@ with tab_manual:
                         <div style="position:absolute;right:0;top:5px;font-size:12px;">100%</div></div></div>"""
 
         st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit")
-        rocket_cols_display = st.columns(len(predictions_manual) if predictions_manual else 1) # Neuer Variablenname
-        
+        rocket_cols_display = st.columns(len(predictions_manual) if predictions_manual else 1) 
         idx = 0
-        for model_key_iter, result in predictions_manual.items(): # Klare Iterationsvariablen
+        for model_key_iter, result in predictions_manual.items(): 
             with rocket_cols_display[idx]:
                 st.markdown(render_rocket_probability(result['proba'], model_key_iter.upper()), unsafe_allow_html=True)
-                if result['pred'] == 1: # Einfachere Bedingung
+                if result['pred'] == 1: 
                     st.success(f"✅ {model_key_iter.upper()}: Zufrieden ({result['proba']:.2%})")
                 else:
                     st.warning(f"⚠️ {model_key_iter.upper()}: Eher unzufrieden ({result['proba']:.2%})")
@@ -523,23 +475,21 @@ with tab_manual:
         st.markdown("---")
         st.subheader("💡 Empfehlungen zur Verbesserung der Zufriedenheit")
         
-        avg_prob_manual = np.mean(proba_values) if proba_values else 0.0 # Neuer Variablenname
-
-        # Stelle sicher, dass input_df_manual die Spalte 'Delay' und andere erwartete Spalten hat
-        # Dies wird durch die Erstellung in user_input_features_manual mit feature_order sichergestellt.
-        relevant_features_for_llm = {k: v for k, v in input_df_manual.iloc[0].to_dict().items() if k in feature_order}
-
-        with st.spinner("Generiere Empfehlungen basierend auf deinen Eingaben..."):
-            try:
-                recommendation = generate_action_recommendations(relevant_features_for_llm)
-                st.success("✅ Empfehlungen erfolgreich generiert:")
-                st.markdown(recommendation)
-            except Exception as e:
-                st.error(f"Fehler bei der Generierung der Empfehlungen: {e}")
-                st.exception(e)
+        # Empfehlungen nur nach Button-Klick generieren
+        if st.button("Empfehlungen für diesen Kunden generieren", key="generate_manual_input_recommendations_button"):
+            relevant_features_for_llm = {k: v for k, v in input_df_manual.iloc[0].to_dict().items() if k in feature_order}
+            with st.spinner("Generiere Empfehlungen basierend auf deinen Eingaben..."):
+                try:
+                    recommendation = generate_action_recommendations(relevant_features_for_llm)
+                    st.success("✅ Empfehlungen erfolgreich generiert:")
+                    st.markdown(recommendation)
+                except Exception as e:
+                    st.error(f"Fehler bei der Generierung der Empfehlungen: {e}")
+                    st.exception(e)
 
         st.markdown("---")
         st.markdown(f"### 📊 Gesamtbewertung")
+        avg_prob_manual = np.mean(proba_values) if proba_values else 0.0 
         st.markdown(f"**Durchschnittliche Zufriedenheitswahrscheinlichkeit (aller Modelle): {avg_prob_manual:.2%}**")
         if avg_prob_manual >= 0.7: st.success("✅ Der Kunde wird höchstwahrscheinlich sehr zufrieden sein!")
         elif avg_prob_manual >= 0.5: st.success("✅ Der Kunde wird wahrscheinlich zufrieden sein.")
