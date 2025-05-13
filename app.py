@@ -137,7 +137,7 @@ with tab_insights:
         key="top_n_slider_insights_main" 
     )
 
-    sub_tab1_global, sub_tab1_segments = st.tabs(["🎯 Globale Feature Importances", "🔍 Segmente"])
+    sub_tab1_global, sub_tab1_segments, sub_tab1_bcg = st.tabs(["🎯 Globale Feature Importances", "🔍 Segmente", "💡 Prioritätsmatrix"])
 
     with sub_tab1_global:
         st.header("🎯 Globale Feature Importances")
