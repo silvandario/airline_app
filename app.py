@@ -11,10 +11,6 @@ import lightgbm as lgb # Behalte ich bei, da es im Originalimport war
 import shap
 import os
 
-# Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
-# Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
-from llm import generate_action_recommendations, generate_segment_recommendations_from_shap
-
 # Seiteneinrichtung
 st.set_page_config(
     page_title="Airline Satisfaction Dashboard",
@@ -22,6 +18,12 @@ st.set_page_config(
     page_icon="✈️",
     initial_sidebar_state="expanded"
 )
+
+# fgagjhbo
+# Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
+# Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
+from llm import generate_action_recommendations, generate_segment_recommendations_from_shap
+
 
 # Cache-Funktionen für Ressourcen und Daten
 @st.cache_resource
