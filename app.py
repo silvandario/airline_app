@@ -324,6 +324,71 @@ with tab_insights:
             "Ease of Online Booking", "Departure and Arrival Time Convenience", 
             "Gate Location", "Leg Room Service"
         ]
+        y_train = None
+        try:
+            y_train = joblib.load("models/y_train.pkl")
+            if isinstance(y_train, pd.DataFrame):
+                y_train = y_train.squeeze()
+        except Exception:
+            pass
+
+        performance_basis = st.radio("Welche Basis soll für die Performance-Werte verwendet werden?",
+            options=["Gesamtdurchschnitt", "Nur unzufriedene Kunden"],
+            index=0 if y_train is None else 1,
+            disabled=(y_train is None),
+            key="performance_basis_choice")
+
+        df_used = X_train_df.copy()
+        if not df_used.empty and not shap_values_df.empty:
+            shap_means = shap_values_df.abs().mean()
+            shap_means = shap_means[service_features].sort_values(ascending=False)
+
+            if performance_basis == "Nur unzufriedene Kunden" and y_train is not None:
+                df_used = df_used[y_train == 0]
+
+            mean_ratings = df_used[service_features].mean()
+
+            matrix_df = pd.DataFrame({
+                "Feature": service_features,
+                "Wichtigkeit (SHAP)": shap_means,
+                "Bewertung (1-5)": mean_ratings
+            }).dropna()
+
+            x_median = matrix_df["Bewertung (1-5)"].median()
+            y_median = matrix_df["Wichtigkeit (SHAP)"].median()
+
+            fig, ax = plt.subplots(figsize=(10, 8))
+            scatter = ax.scatter(
+                matrix_df["Bewertung (1-5)"],
+                matrix_df["Wichtigkeit (SHAP)"],
+                s=200,
+                alpha=0.8,
+                c=matrix_df["Wichtigkeit (SHAP)"],
+                cmap="coolwarm",
+                edgecolors="black"
+            )
+
+            for i, row in matrix_df.iterrows():
+                ax.text(row["Bewertung (1-5)"]+0.02, row["Wichtigkeit (SHAP)"], row["Feature"], fontsize=9)
+
+            ax.axvline(x=x_median, color="gray", linestyle="--")
+            ax.axhline(y=y_median, color="gray", linestyle="--")
+
+            ax.set_xlabel("Durchschnittliche Bewertung (1 = schlecht, 5 = sehr gut)")
+            ax.set_ylabel("Wichtigkeit (mittlerer SHAP-Wert)")
+            ax.set_title("Prioritätsmatrix: Servicequalität vs. Einfluss auf Zufriedenheit")
+
+            st.pyplot(fig)
+
+            st.markdown("""
+            **Interpretation:**
+            - **Oben links (hoch, schlecht bewertet)**: 🔥 _Sofortige Aufmerksamkeit nötig_
+            - **Unten links (niedrig, schlecht bewertet)**: 🤔 _Low Priority_
+            - **Oben rechts (hoch, gut bewertet)**: ✅ _Stärken beibehalten_
+            - **Unten rechts (niedrig, gut bewertet)**: 💤 _Wenig Einfluss_
+            """)
+        else:
+            st.warning("Nicht genügend Daten für die Matrix verfügbar.")
 # Tab 2: CSV Upload & Predict
 with tab_upload:
     st.header("📤 Daten hochladen und Vorhersagen treffen")
