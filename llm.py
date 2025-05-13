@@ -26,6 +26,8 @@ def generate_action_recommendations(user_features: dict, view_mode: str) -> str:
 Bitte gib basierend darauf konkrete, umsetzbare Vorschläge für die Airline, 
 um die Zufriedenheit dieses speziellen Kundentyps zu verbessern.
 Konzentriere dich auf die Aspekte, die kritisch erscheinen oder niedrig bewertet wurden (Bewertungsskala 1-5, 5 ist das Beste).
+Berücksichtige dabei **nicht** das Geschlecht des Kunden oder die Sitzplatzklasseals Faktor für die Bewertung oder Empfehlungen.
+Diese dienen nur zur Information und dürfen keine Handlungsempfehlungen beeinflussen.
 
 Eingaben des Kunden:
 """
