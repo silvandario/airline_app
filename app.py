@@ -325,6 +325,7 @@ with tab_insights:
             "Gate Location", "Leg Room Service"
         ]
         y_train = None
+        # unzufriedener Kunden geht nur falls y_train.pkl verfügbar ist
         try:
             y_train = joblib.load("models/y_train.pkl")
             if isinstance(y_train, pd.DataFrame):
