@@ -11,6 +11,8 @@ import lightgbm as lgb # Behalte ich bei, da es im Originalimport war
 import shap
 import os
 
+# Kanoj wurde abgezockt 
+
 # Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
 # Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
 from llm import generate_action_recommendations, generate_segment_recommendations_from_shap
@@ -408,8 +410,8 @@ with tab_upload:
                     if df_for_scaling[col].isnull().any():
                         st.warning(f"Spalte '{col}' in den hochgeladenen Daten enthält fehlende Werte. Diese werden mit 0 ersetzt.")
                         df_for_scaling[col] = df_for_scaling[col].fillna(0)
-                df_scaled = models["scaler"].transform(df_for_scaling)
-                results_df = df_upload.copy()
+                scaled_data_numpy = models["scaler"].transform(df_for_scaling) # Schritt 1: Skalieren (gibt NumPy Array zurück)
+                df_scaled = pd.DataFrame(scaled_data_numpy, columns=feature_order) # Schritt 2: In DataFrame mit Namen umwandeln
                 for model_key in ["xgb", "rf", "lgbm"]:
                     if model_key in models and models[model_key] is not None:
                         model_instance = models[model_key]
