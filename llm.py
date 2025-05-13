@@ -2,129 +2,184 @@
 
 from openai import OpenAI
 import streamlit as st
-import pandas as pd # Hinzugefügt für Typ-Hinting
+import pandas as pd
 
-# Stelle sicher, dass der API-Key geladen ist. 
-# In einer echten Anwendung sollte dies sicher gehandhabt werden.
-# Für Streamlit Cloud z.B. über st.secrets
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 except Exception as e:
-    st.error(f"OpenAI API Key konnte nicht geladen werden: {e}. Bitte stelle sicher, dass er in den Streamlit Secrets konfiguriert ist.")
-    client = None # Setze client auf None, um Fehler später abzufangen
+    # Statt st.error direkt hier, was die App beenden könnte, wenn llm.py importiert wird,
+    # geben wir None zurück und behandeln das in der App.
+    # In der App wird bereits eine Fehlermeldung angezeigt, wenn client None ist.
+    # st.error(f"OpenAI API Key konnte nicht geladen werden: {e}. Bitte stelle sicher, dass er in den Streamlit Secrets konfiguriert ist.")
+    print(f"Fehler beim Initialisieren des OpenAI Clients: {e}") # Für lokale Logs
+    client = None
 
-def generate_action_recommendations(user_features: dict) -> str:
+def generate_action_recommendations(user_features: dict, view_mode: str) -> str:
     """
-    Erzeugt systematische Empfehlungen basierend auf Nutzereingaben (individuelle Bewertung).
+    Erzeugt systematische Empfehlungen basierend auf Nutzereingaben (individuelle Bewertung),
+    angepasst an den Ansichtsmodus (Management oder Data Analyst).
     """
     if client is None:
-        return "OpenAI Client nicht initialisiert. Empfehlungen können nicht generiert werden."
+        return "OpenAI Client nicht initialisiert. Empfehlungen können nicht generiert werden. Bitte API Key überprüfen."
 
-    prompt = """Du bist ein Service-Optimierungs-Experte für Fluggesellschaften.
-Ein Kunde hat kürzlich eine Flugreise gemacht. Basierend auf den folgenden Bewertungsmerkmalen
-(1 bis 5, wobei 5 das Beste ist), sollst du Empfehlungen geben, wie die Zufriedenheit
-verbessert werden kann. Konzentriere dich auf die wichtigsten Faktoren.
+    base_prompt = """Ein Fluggast hat die folgenden Eingaben gemacht. 
+Bitte gib basierend darauf konkrete, umsetzbare Vorschläge für die Airline, 
+um die Zufriedenheit dieses speziellen Kundentyps zu verbessern.
+Konzentriere dich auf die Aspekte, die kritisch erscheinen oder niedrig bewertet wurden (Bewertungsskala 1-5, 5 ist das Beste).
 
-Hier sind die Eingaben des Kunden:
+Eingaben des Kunden:
 """
-    # Filtere nur relevante Bewertungsmerkmale (1-5 Skala)
-    # und formatiere sie für den Prompt
     relevant_ratings = []
     for k, v in user_features.items():
-        # Versuche, den Wert in eine Zahl umzuwandeln, falls es ein String ist, der eine Zahl darstellt
         try:
             val_num = float(v)
-            if 1 <= val_num <= 5: # Typische Bewertungsskala
-                 relevant_ratings.append(f"- {k.replace('_', ' ').replace('_Male', '').replace(' Type Returning', '').replace(' of Travel Personal','').replace(' Class Economy','').replace('Class Economy Plus','')} (Bewertung): {int(val_num)}")
+            if 1 <= val_num <= 5: 
+                # Vereinfachte Darstellung der Feature-Namen für den Prompt
+                feature_display_name = k.replace('_', ' ').replace(' Type Returning', ' Wiederkehrend').replace(' of Travel Personal',' Privat').replace(' Class Economy Plus',' Economy Plus').replace(' Class Economy',' Economy').replace('Male', '').replace('Gender','Geschlecht')
+                if 'Geschlecht' in feature_display_name and val_num == 1 : feature_display_name = "Geschlecht: Männlich"
+                elif 'Geschlecht' in feature_display_name and val_num == 0 : feature_display_name = "Geschlecht: Weiblich"
+                elif 'Wiederkehrend' in feature_display_name and val_num == 1 : feature_display_name = "Kundentyp: Wiederkehrend"
+                elif 'Wiederkehrend' in feature_display_name and val_num == 0 : feature_display_name = "Kundentyp: Neu"
+                elif 'Privat' in feature_display_name and val_num == 1 : feature_display_name = "Reisetyp: Privat"
+                elif 'Privat' in feature_display_name and val_num == 0 : feature_display_name = "Reisetyp: Geschäftlich"
+                elif 'Economy Plus' in feature_display_name and val_num == 1 : feature_display_name = "Klasse: Economy Plus"
+                elif 'Economy' in feature_display_name and val_num == 1 : feature_display_name = "Klasse: Economy"
+                elif user_features.get('Class_Economy', 0) == 0 and user_features.get('Class_Economy Plus', 0) == 0 and k == 'Class_Economy':
+                    feature_display_name = "Klasse: Business" # Nur einmal für Business Klasse anzeigen
+                    relevant_ratings.append(f"- {feature_display_name.strip()}")
+                    continue # Nächste Iteration, um Duplikate für Class_Economy/Plus zu vermeiden
+                elif k == 'Class_Economy Plus' and user_features.get('Class_Economy', 0) == 0 and user_features.get('Class_Economy Plus', 0) == 0:
+                    continue # Bereits als Business behandelt
+
+                if 'Bewertung' not in feature_display_name : # Nur hinzufügen, wenn es nicht bereits spezialbehandelt wurde
+                     relevant_ratings.append(f"- {feature_display_name.strip()} (Bewertung): {int(val_num)}")
+
         except (ValueError, TypeError):
-            # Ignoriere Features, die nicht auf der 1-5 Skala sind oder nicht konvertierbar sind
-            # oder behandle sie gesondert, wenn nötig (z.B. Alter, Flugdistanz etc.)
             if k in ['Age', 'Flight Distance', 'Delay']:
-                 relevant_ratings.append(f"- {k.replace('_', ' ')}: {v}")
-            elif 'Gender_Male' in k and v == 1:
-                 relevant_ratings.append(f"- Geschlecht: Männlich")
-            elif 'Gender_Male' in k and v == 0:
-                 relevant_ratings.append(f"- Geschlecht: Weiblich")
-            elif 'Customer Type_Returning' in k and v == 1:
-                 relevant_ratings.append(f"- Kundentyp: Wiederkehrend")
-            elif 'Customer Type_Returning' in k and v == 0:
-                 relevant_ratings.append(f"- Kundentyp: Neu")
-            elif 'Type of Travel_Personal' in k and v == 1:
-                 relevant_ratings.append(f"- Reisetyp: Privat")
-            elif 'Type of Travel_Personal' in k and v == 0:
-                 relevant_ratings.append(f"- Reisetyp: Geschäftlich")
-            elif 'Class_Economy' in k and v == 1:
-                 relevant_ratings.append(f"- Klasse: Economy")
-            elif 'Class_Economy Plus' in k and v == 1:
-                 relevant_ratings.append(f"- Klasse: Economy Plus")
-            elif ('Class_Economy' in k and v == 0) and ('Class_Economy Plus' in user_features and user_features['Class_Economy Plus'] == 0) : # Business
-                 relevant_ratings.append(f"- Klasse: Business")
-
-
+                relevant_ratings.append(f"- {k.replace('_', ' ')}: {v}")
+    
     if not relevant_ratings:
-        prompt += "Keine spezifischen numerischen Bewertungen im Bereich 1-5 für Service-Features gefunden. Gib allgemeine Ratschläge."
+        base_prompt += "Keine spezifischen Bewertungen oder demographischen Daten für detaillierte Empfehlungen gefunden. Gib allgemeine Ratschläge zur Steigerung der Flugzufriedenheit."
     else:
-        prompt += "\n".join(relevant_ratings)
+        base_prompt += "\n".join(relevant_ratings)
 
+    if view_mode == "Management":
+        system_message = "Du bist ein Managementberater für Fluggesellschaften. Formuliere deine Antworten prägnant, strategisch und direkt auf den Punkt für eine Führungsebene."
+        prompt_suffix = "\n\nGib genau 3-4 übergeordnete, strategische Empfehlungen für das Management, die aus diesen Kundeneingaben abgeleitet werden können. Vermeide zu technischen Details."
+    else: # Data Analyst
+        system_message = "Du bist ein Datenanalyst und Optimierungsexperte für Fluggesellschaften. Gib detaillierte und datengestützte Empfehlungen."
+        prompt_suffix = "\n\nGib maximal 5 detaillierte und spezifische, umsetzbare Vorschläge für die Airline. Erkläre kurz, warum diese basierend auf den Kundendaten sinnvoll sind."
 
-    prompt += "\n\nGib max. 5 spezifische, umsetzbare Vorschläge für die Airline, um die Zufriedenheit dieses speziellen Kundentyps basierend auf den gegebenen Informationen zu verbessern. Konzentriere dich auf die Aspekte, die wahrscheinlich eine niedrige Bewertung erhalten haben oder kritisch sind."
-
+    final_prompt = base_prompt + prompt_suffix
     messages = [
-        {"role": "system", "content": "Du bist ein Airline-Zufriedenheits-Optimierer und gibst konkrete Ratschläge."},
-        {"role": "user", "content": prompt}
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": final_prompt}
     ]
     
     try:
-        stream = client.chat.completions.create(
-            model=st.session_state.get("openai_model", "gpt-3.5-turbo"), # Fallback, falls nicht in session_state
+        response = client.chat.completions.create(
+            model=st.session_state.get("openai_model", "gpt-3.5-turbo"),
             messages=messages,
-            stream=True,
+            stream=False, # Für einfachere Handhabung hier kein Stream
         )
-        return "".join(chunk.choices[0].delta.content or "" for chunk in stream)
+        return response.choices[0].message.content
     except Exception as e:
-        st.error(f"OpenAI API Fehler: {e}")
-        return "Fehler bei der Kommunikation mit der OpenAI API."
+        # st.error(f"OpenAI API Fehler: {e}") # Fehlerbehandlung in app.py
+        print(f"OpenAI API Fehler in generate_action_recommendations: {e}")
+        return "Fehler bei der Kommunikation mit der OpenAI API. Empfehlungen konnten nicht generiert werden."
 
-def generate_segment_recommendations_from_shap(segment_shap_summary: pd.DataFrame) -> str:
+
+def generate_segment_recommendations_from_shap(segment_shap_summary: pd.DataFrame, view_mode: str) -> str:
     """
-    Erzeugt Handlungsempfehlungen basierend auf der SHAP-Analyse eines Kundensegments.
+    Erzeugt Handlungsempfehlungen basierend auf der SHAP-Analyse eines Kundensegments,
+    angepasst an den Ansichtsmodus.
     """
     if client is None:
-        return "OpenAI Client nicht initialisiert. Empfehlungen können nicht generiert werden."
+        return "OpenAI Client nicht initialisiert. Empfehlungen können nicht generiert werden. Bitte API Key überprüfen."
 
-    prompt = """Du bist ein Service-Optimierungs-Experte für Fluggesellschaften.
-Eine SHAP-Analyse für ein bestimmtes Kundensegment hat die folgenden Top-Einflussfaktoren auf die Kundenzufriedenheit ergeben.
-'Einfluss-Stärke' ist der mittlere absolute SHAP-Wert (je höher, desto wichtiger das Feature für das Segment).
-'Tendenz' gibt an, ob das Feature die Zufriedenheit im Durchschnitt eher positiv oder negativ beeinflusst hat.
+    prompt = """Eine Analyse der Treiber für Kundenzufriedenheit (basierend auf SHAP-Werten) für eine spezifische Kundengruppe hat folgende Top-Faktoren ergeben:
+'Einfluss-Stärke' beschreibt die relative Wichtigkeit des Faktors für diese Gruppe.
+'Tendenz' zeigt, ob der Faktor die Zufriedenheit im Schnitt positiv oder negativ beeinflusst hat.
 
-Hier sind die Daten des Segments:
+Daten der Kundengruppe:
 """
     for index, row in segment_shap_summary.iterrows():
-        prompt += f"- Feature: {row['Feature'].replace('_', ' ')}\n"
-        prompt += f"  Einfluss-Stärke (relativ): {row['Einfluss-Stärke']:.2f}\n" # Als Zahl für LLM
-        prompt += f"  Durchschnittliche Tendenz auf Zufriedenheit: {row['Tendenz'].replace('✅','').replace('❌','').replace('➖','')}\n"
+        prompt += f"- Faktor: {row['Feature'].replace('_', ' ')}\n"
+        if view_mode == "Data Analyst": # Nur für DA die Stärke explizit nennen
+            prompt += f"  Relative Wichtigkeit (SHAP): {row['Einfluss-Stärke']:.2f}\n"
+        prompt += f"  Durchschnittliche Tendenz auf Zufriedenheit: {row['Tendenz'].replace('✅','').replace('❌','').replace('➖','').strip()}\n"
 
-    prompt += """
-Analysiere diese Faktoren.
-Gib genau 5 konkrete und umsetzbare Handlungsempfehlungen für die Fluggesellschaft, 
-um die Zufriedenheit speziell für dieses Kundensegment zu verbessern. 
-Konzentriere dich dabei vor allem auf die Features mit starkem negativen Einfluss 
-und überlege, wie positive Einflussfaktoren weiter gestärkt oder genutzt werden können.
-Formuliere die Empfehlungen klar und direkt.
+    if view_mode == "Management":
+        system_message = "Du bist ein Airline-Strategieberater für das Top-Management. Konzentriere dich auf übergeordnete strategische Hebel."
+        prompt += """
+Analysiere diese Hauptfaktoren.
+Formuliere 3-4 prägnante, strategische Handlungsempfehlungen für das Management, 
+um die Zufriedenheit speziell dieser Kundengruppe zu verbessern. 
+Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und größte Chancen (starker positiver Einfluss).
+"""
+    else: # Data Analyst
+        system_message = "Du bist ein Datenanalyst und Airline-Optimierungsexperte. Gib detaillierte und fundierte Empfehlungen."
+        prompt += """
+Analysiere diese Faktoren detailliert.
+Gib genau 5 konkrete und umsetzbare Handlungsempfehlungen für die Fluggesellschaft.
+Beziehe dich auf die relative Wichtigkeit und die Tendenz der Faktoren.
+Erläutere kurz die datengestützte Begründung für jede Empfehlung.
 """
 
     messages = [
-        {"role": "system", "content": "Du bist ein Airline-Strategieberater, der SHAP-Daten interpretiert und daraus Handlungsempfehlungen ableitet."},
+        {"role": "system", "content": system_message},
         {"role": "user", "content": prompt}
     ]
     
     try:
-        stream = client.chat.completions.create(
-            model=st.session_state.get("openai_model", "gpt-3.5-turbo"), # Fallback
+        response = client.chat.completions.create(
+            model=st.session_state.get("openai_model", "gpt-3.5-turbo"),
             messages=messages,
-            stream=True,
+            stream=False, 
         )
-        return "".join(chunk.choices[0].delta.content or "" for chunk in stream)
+        return response.choices[0].message.content
     except Exception as e:
-        st.error(f"OpenAI API Fehler: {e}")
-        return "Fehler bei der Kommunikation mit der OpenAI API."
+        print(f"OpenAI API Fehler in generate_segment_recommendations_from_shap: {e}")
+        return "Fehler bei der Kommunikation mit der OpenAI API. Empfehlungen konnten nicht generiert werden."
+
+
+def generate_global_importance_explanation(feature_importances_data: pd.Series, model_name_display: str, view_mode: str) -> str:
+    """
+    Erzeugt eine kurze Erklärung eines Feature Importance Diagramms für das Management.
+    feature_importances_data: Pandas Series mit Feature als Index und Importance als Wert.
+    model_name_display: Angezeigter Name des Modells oder der Zusammenfassung.
+    """
+    if client is None:
+        return "OpenAI Client nicht initialisiert. Erklärung kann nicht generiert werden. Bitte API Key überprüfen."
+
+    prompt_intro = f"""Du bist ein Datenexperte, der komplexe Analyseergebnisse für das Management verständlich aufbereitet.
+Das folgende Diagramm zeigt die wichtigsten Treiber für die Kundenzufriedenheit, basierend auf dem {model_name_display}. 
+Die Länge der Balken indiziert die Wichtigkeit des Faktors.
+
+Top Treiber (absteigende Wichtigkeit):
+"""
+    feature_list_str = ""
+    for feature, importance_val in feature_importances_data.head(5).items(): # Erkläre die Top 5
+        feature_list_str += f"- {feature.replace('_', ' ')} (Relative Wichtigkeit: {importance_val:.2%})\n"
+
+    prompt = prompt_intro + feature_list_str
+
+    prompt += """
+Bitte fasse die Kernaussage dieses Diagramms in 3-5 prägnanten Sätzen zusammen. 
+Welche 1-2 wichtigsten Schlussfolgerungen sollte das Management hieraus ziehen?
+Die Erklärung ist für eine Management-Ebene gedacht und sollte entsprechend formuliert sein (klar, handlungsorientiert, ohne tiefgehende technische Details).
+"""
+    messages = [
+        {"role": "system", "content": "Du bist ein Kommunikationsexperte, der Datenvisualisierungen für Führungskräfte interpretiert."},
+        {"role": "user", "content": prompt}
+    ]
+    try:
+        response = client.chat.completions.create(
+            model=st.session_state.get("openai_model", "gpt-3.5-turbo"),
+            messages=messages,
+            stream=False,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"OpenAI API Fehler in generate_global_importance_explanation: {e}")
+        return "Fehler bei der Kommunikation mit der OpenAI API. Erklärung konnte nicht generiert werden."
