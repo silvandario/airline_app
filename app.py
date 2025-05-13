@@ -19,9 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# fgagjhbo
-# Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
-# Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
+
 from llm import generate_action_recommendations, generate_segment_recommendations_from_shap
 
 
