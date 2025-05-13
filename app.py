@@ -314,7 +314,16 @@ with tab_insights:
                         st.warning("Keine Daten im Segment für die Analyse vorhanden.")
             else:
                 st.warning("Keine Daten für das ausgewählte Segment gefunden. Bitte passen Sie die Filter an.")
+    with sub_tab1_bcg:
+        st.header("💡 BCG-Matrix zur Priorisierung")
 
+        service_features = [
+            "Seat Comfort", "Cleanliness", "Food and Drink", "In-flight Wifi Service",
+            "In-flight Entertainment", "Baggage Handling", "On-board Service", 
+            "In-flight Service", "Check-in Service", "Online Boarding", 
+            "Ease of Online Booking", "Departure and Arrival Time Convenience", 
+            "Gate Location", "Leg Room Service"
+        ]
 # Tab 2: CSV Upload & Predict
 with tab_upload:
     st.header("📤 Daten hochladen und Vorhersagen treffen")
