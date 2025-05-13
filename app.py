@@ -11,8 +11,6 @@ import lightgbm as lgb # Behalte ich bei, da es im Originalimport war
 import shap
 import os
 
-# Kanoj wurde abgezockt 
-
 # Annahme: llm.py existiert und hat die Funktion generate_action_recommendations
 # Falls nicht, musst du sie bereitstellen oder diesen Import auskommentieren/anpassen
 from llm import generate_action_recommendations, generate_segment_recommendations_from_shap
@@ -412,13 +410,15 @@ with tab_upload:
                         df_for_scaling[col] = df_for_scaling[col].fillna(0)
                 scaled_data_numpy = models["scaler"].transform(df_for_scaling) # Schritt 1: Skalieren (gibt NumPy Array zurück)
                 df_scaled = pd.DataFrame(scaled_data_numpy, columns=feature_order) # Schritt 2: In DataFrame mit Namen umwandeln
+                results_df = df_upload.copy()
                 for model_key in ["xgb", "rf", "lgbm"]:
                     if model_key in models and models[model_key] is not None:
                         model_instance = models[model_key]
                         pred_col_name = f"{model_key.upper()} Prediction"
                         prob_col_name = f"{model_key.upper()} Prob (Zufrieden)"
-                        results_df[pred_col_name] = model_instance.predict(df_scaled)
-                        results_df[prob_col_name] = model_instance.predict_proba(df_scaled)[:, 1] 
+                        
+                        results_df[pred_col_name] = model_instance.predict(df_scaled) # df_scaled ist jetzt ein DataFrame
+                        results_df[prob_col_name] = model_instance.predict_proba(df_scaled)[:, 1] # df_scaled ist jetzt ein DataFrame
                     else:
                         st.warning(f"{model_key.upper()}-Modell nicht geladen. Keine Vorhersage möglich.")
                 st.success("✅ Vorhersage erfolgreich durchgeführt!")
@@ -497,21 +497,24 @@ with tab_manual:
 
     if models is None or "scaler" not in models or models["scaler"] is None:
         st.error("Scaler-Modell nicht geladen. Manuelle Vorhersage nicht möglich.")
+
     else:
-        scaled_input_manual = models["scaler"].transform(input_df_manual) 
+        scaled_input_manual_numpy = models["scaler"].transform(input_df_manual) # Schritt 1: Skalieren
+        scaled_input_manual = pd.DataFrame(scaled_input_manual_numpy, columns=feature_order) # Schritt 2: In DataFrame mit Namen umwandeln
+        
         predictions_manual = {} 
         proba_values = []
 
         for model_key in ["xgb", "rf", "lgbm"]:
             if model_key in models and models[model_key] is not None:
                 model_instance = models[model_key]
-                pred = model_instance.predict(scaled_input_manual)[0]
-                proba = model_instance.predict_proba(scaled_input_manual)[0][1]
-                predictions_manual[model_key] = {"pred": pred, "proba": proba}
-                proba_values.append(proba)
+                pred = model_instance.predict(scaled_input_manual)[0] # scaled_input_manual ist jetzt ein DataFrame
+                proba = model_instance.predict_proba(scaled_input_manual)[0][1] # scaled_input_manual ist jetzt ein DataFrame
+                predictions_manual[model_key] = {"pred": pred, "proba": proba} # KORREKTUR
+                proba_values.append(proba)                                      # KORREKTUR
             else:
                 st.warning(f"{model_key.upper()}-Modell nicht geladen. Keine Vorhersage möglich.")
-                predictions_manual[model_key] = {"pred": 0, "proba": 0.0} 
+                predictions_manual[model_key] = {"pred": 0, "proba": 0.0} # Fallback
                 proba_values.append(0.0)
 
         st.markdown("### 🔍 Modellvorhersagen:")
