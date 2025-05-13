@@ -748,10 +748,9 @@ with tab_manual:
                             <h3 style="margin-bottom:5px;">{model_name_render}: {prob:.2%}</h3>
                             <div style="position:absolute;top:10px;right:10px;font-size:16px;background-color:rgba(255,255,255,0.2);padding:5px;border-radius:5px;">{atmosphere_text}</div>
                             <div style="margin-top:{max(0,100-height)}px;font-size:36px;">{rocket}</div><div style="font-size:24px;">{flame}</div>
-                            <div style="margin-top:10px;border-top:2px dashed white;position:relative;"><div style="position:absolute;left:0;top:5px;font-size:12px;">0%</div>
-                            <div style="position:absolute;left:50%;transform:translateX(-50%);top:5px;font-size:12px;">50%</div>
-                            <div style="position:absolute;right:0;top:5px;font-size:12px;">100%</div></div></div>"""
-
+                            """
+            
+    
             st.markdown("---") 
             st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit") 
             rocket_cols_display = st.columns(len(predictions_manual) if predictions_manual else 1) 
