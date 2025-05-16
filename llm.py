@@ -117,7 +117,7 @@ Daten der Kundengruppe:
 Analysiere diese Hauptfaktoren.
 Formuliere 3-4 prägnante, strategische Handlungsempfehlungen für das Management, 
 um die Zufriedenheit speziell dieser Kundengruppe zu verbessern. 
-Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und größte Chancen (starker positiver Einfluss).
+Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und grösste Chancen (starker positiver Einfluss).
 """
     else: # Data Analyst
         system_message = "Du bist ein Datenanalyst und Airline-Optimierungsexperte. Gib detaillierte und fundierte Empfehlungen."

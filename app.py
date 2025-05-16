@@ -178,7 +178,7 @@ if st.session_state.view_mode == "Data Analyst":
         /* Spezifische Anpassungen für Alert-Typen, falls nötig (optional) */
         .stAlert.st-ae, .stAlert.st-af, .stAlert.st-ag, .stAlert.st-ah {{ /* Streamlit interne Klassen für info, success, warning, error */
             /* Hier könnten spezifische Hintergrundfarben für die Boxen gesetzt werden, 
-               die gut mit dem dunklen Hintergrund und weißem Text harmonieren, 
+               die gut mit dem dunklen Hintergrund und weissem Text harmonieren, 
                aber das wird schnell komplex. Vorerst nur Textfarbe. */
         }}
         </style>
@@ -692,7 +692,7 @@ with tab_manual:
             if avg_prob_manual >= 0.7: st.success("✅ Dieser Fluggasttyp wird höchstwahrscheinlich sehr zufrieden sein!")
             elif avg_prob_manual >= 0.5: st.success("✅ Dieser Fluggasttyp wird wahrscheinlich zufrieden sein.")
             elif avg_prob_manual >= 0.4: st.info("ℹ️ Zufriedenheit dieses Fluggasttyps ist unsicher, Verbesserungspotential.") 
-            else: st.error("❌ Dieser Fluggasttyp wird wahrscheinlich unzufrieden sein. Maßnahmen prüfen!") 
+            else: st.error("❌ Dieser Fluggasttyp wird wahrscheinlich unzufrieden sein. Massnahmen prüfen!") 
             
             st.markdown("---")
             st.subheader("💡 KI-basierte Empfehlungen") 
