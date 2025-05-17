@@ -93,7 +93,7 @@ Eingaben des Kunden:
         return "Fehler bei der Kommunikation mit der OpenAI API. Empfehlungen konnten nicht generiert werden."
 
 
-def generate_segment_recommendations_from_shap(segment_shap_summary: pd.DataFrame, view_mode: str) -> str:
+def generate_segment_recommendations_from_shap(segment_shap_summary: pd.DataFrame, view_mode: str, additional_prompt: str = "") -> str:
     """
     Erzeugt Handlungsempfehlungen basierend auf der SHAP-Analyse eines Kundensegments,
     angepasst an den Ansichtsmodus.
@@ -115,20 +115,12 @@ Daten der Kundengruppe:
 
     if view_mode == "Management":
         system_message = "Du bist ein Airline-Strategieberater für das Top-Management. Konzentriere dich auf übergeordnete strategische Hebel."
-        prompt += """
-Analysiere diese Hauptfaktoren.
-Formuliere 3-4 prägnante, strategische Handlungsempfehlungen für das Management, 
-um die Zufriedenheit speziell dieser Kundengruppe zu verbessern. 
-Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und grösste Chancen (starker positiver Einfluss).
-"""
+        if additional_prompt:
+            prompt = prompt + additional_prompt
     else: # Data Analyst
         system_message = "Du bist ein Datenanalyst und Airline-Optimierungsexperte. Gib detaillierte und fundierte Empfehlungen."
-        prompt += """
-Analysiere diese Faktoren detailliert.
-Gib genau 5 konkrete und umsetzbare Handlungsempfehlungen für die Fluggesellschaft.
-Beziehe dich auf die relative Wichtigkeit und die Tendenz der Faktoren.
-Erläutere kurz die datengestützte Begründung für jede Empfehlung.
-"""
+        if additional_prompt:
+            prompt = prompt + additional_prompt
 
     messages = [
         {"role": "system", "content": system_message},

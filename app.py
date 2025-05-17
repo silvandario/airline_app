@@ -10,7 +10,8 @@ import seaborn as sns
 import lightgbm as lgb 
 import shap
 import os
-from prompts.managementPrompts import prompt_KIBasierteEmpfehlungen_Management
+from prompts.managementPrompts import prompt_KIBasierteEmpfehlungen_Management, prompt_SHAP_Management
+from prompts.analystPrompts import prompt_SHAP_Analyst
 
 
 # Seiteneinrichtung
@@ -444,14 +445,24 @@ with tab_insights:
                 
                 if st.button("Analyse & Empfehlungen für Kundengruppe generieren", key="analyze_segment_llm_button_relocated"):
                     if not influence_df_for_llm.empty:
-                        with st.spinner("Generiere Handlungsempfehlungen..."):
-                            try:
-                                recommendations_segment = generate_segment_recommendations_from_shap(influence_df_for_llm, st.session_state.view_mode)
-                                st.success("✅ Empfehlungen erfolgreich generiert:")
-                                st.markdown(recommendations_segment)
-                            except Exception as e:
-                                st.error(f"Fehler bei Generierung der Segment-Empfehlungen: {e}")
-                                st.exception(e)
+                        if st.session_state.view_mode == "Management":
+                            with st.spinner("Generiere Handlungsempfehlungen..."):
+                                try:
+                                    recommendations_segment = generate_segment_recommendations_from_shap(influence_df_for_llm, st.session_state.view_mode, additional_prompt=prompt_SHAP_Management)
+                                    st.success("✅ Empfehlungen erfolgreich generiert:")
+                                    st.markdown(recommendations_segment)
+                                except Exception as e:
+                                    st.error(f"Fehler bei Generierung der Segment-Empfehlungen: {e}")
+                                    st.exception(e)
+                        else:
+                            with st.spinner("Generiere Handlungsempfehlungen..."):
+                                try:
+                                    recommendations_segment = generate_segment_recommendations_from_shap(influence_df_for_llm, st.session_state.view_mode, additional_prompt=prompt_SHAP_Analyst)
+                                    st.success("✅ Empfehlungen erfolgreich generiert:")
+                                    st.markdown(recommendations_segment)
+                                except Exception as e:
+                                    st.error(f"Fehler bei Generierung der Segment-Empfehlungen: {e}")
+                                    st.exception(e)
                     else:
                         st.warning("Keine Daten in der Kundengruppe für die Analyse vorhanden (influence_df ist leer).")
                 st.markdown("---") 

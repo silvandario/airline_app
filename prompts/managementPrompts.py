@@ -14,3 +14,11 @@ top_features = [
 prompt_KIBasierteEmpfehlungen_Management = "Die folgenden Merkmale haben sich im Modell als besonders wichtig für die Vorhersage der Zufriedenheit herausgestellt:\n"
 prompt_KIBasierteEmpfehlungen_Management += "\n".join([f"- {feat}" for feat in top_features])
 prompt_KIBasierteEmpfehlungen_Management += "\nBitte berücksichtige diese bei deinen Empfehlungen besonders – negative Bewertungen bei diesen Aspekten haben überdurchschnittlich grossen Einfluss. Alle anderen Features kommen danach von der Wichtigkeit her gesehen."
+
+
+prompt_SHAP_Management="""
+Analysiere diese Hauptfaktoren.
+Formuliere 3-4 prägnante, strategische Handlungsempfehlungen für das Management, 
+um die Zufriedenheit speziell dieser Kundengruppe zu verbessern. 
+Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und die grösste Chancen (starker positiver Einfluss).
+"""
