@@ -14,7 +14,7 @@ except Exception as e:
     print(f"Fehler beim Initialisieren des OpenAI Clients: {e}") # Für lokale Logs
     client = None
 
-def generate_action_recommendations(user_features: dict, view_mode: str) -> str:
+def generate_action_recommendations(user_features: dict, view_mode: str, additional_prompt: str = "") -> str:
     """
     Erzeugt systematische Empfehlungen basierend auf Nutzereingaben (individuelle Bewertung),
     angepasst an den Ansichtsmodus (Management oder Data Analyst).
@@ -73,6 +73,8 @@ Eingaben des Kunden:
         prompt_suffix = "\n\nGib maximal 5 detaillierte und spezifische, umsetzbare Vorschläge für die Airline. Erkläre kurz, warum diese basierend auf den Kundendaten sinnvoll sind."
 
     final_prompt = base_prompt + prompt_suffix
+    if additional_prompt:
+        final_prompt += "\n\n" + additional_prompt
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": final_prompt}

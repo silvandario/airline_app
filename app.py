@@ -10,6 +10,8 @@ import seaborn as sns
 import lightgbm as lgb 
 import shap
 import os
+from prompts.promptKIBasierteEmpfehlungenManagement import prompt_KIBasierteEmpfehlungen_Management
+
 
 # Seiteneinrichtung
 st.set_page_config(
@@ -700,7 +702,11 @@ with tab_manual:
                 relevant_features_for_llm = {k: v for k, v in input_df_manual.iloc[0].to_dict().items() if k in feature_order}
                 with st.spinner("Generiere Empfehlungen..."):
                     try:
-                        recommendation = generate_action_recommendations(relevant_features_for_llm, st.session_state.view_mode)
+                        recommendation = generate_action_recommendations(
+                        user_features=relevant_features_for_llm,
+                        view_mode=st.session_state.view_mode,
+                        additional_prompt=prompt_KIBasierteEmpfehlungen_Management # Neu mit RF Feature Importance werten für top 10 features
+)
                         st.success("✅ Empfehlungen erfolgreich generiert:")
                         st.markdown(recommendation)
                     except Exception as e:
