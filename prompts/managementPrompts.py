@@ -21,4 +21,5 @@ Analysiere diese Hauptfaktoren.
 Formuliere 3-4 prägnante, strategische Handlungsempfehlungen für das Management, 
 um die Zufriedenheit speziell dieser Kundengruppe zu verbessern. 
 Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und die grösste Chancen (starker positiver Einfluss).
+Denk daran, dass die Zielgruppe Manger sind und somit wenig technisches Know How mitbringen.
 """

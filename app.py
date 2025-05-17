@@ -224,7 +224,7 @@ else:  # Management-Modus
 
 
 # Haupttitel
-st.title("✈️ Airline Zufriedenheit: Dashboard & Analysen") 
+st.title("Airline Zufriedenheit: Dashboard & Analysen") 
 
 # Tabs Definition basierend auf dem Ansichtsmodus
 tab_definitions = []
@@ -251,7 +251,7 @@ else: # Data Analyst Modus
 
 # Tab 1: Feature Insights / Übersicht & Kundengruppen
 with tab_insights:
-    header_title = "📊 Übersicht & Kundengruppen" if st.session_state.view_mode == "Management" else "📊 Feature Insights"
+    header_title = "Übersicht & Kundengruppen" if st.session_state.view_mode == "Management" else "Feature Insights"
     st.header(header_title)
 
     max_features_for_slider = len(feature_order) if feature_order else 20
@@ -279,7 +279,7 @@ with tab_insights:
         model_name_for_llm_explanation = ""
 
         if st.session_state.view_mode == "Management":
-            st.header("🎯 Wichtigste Treiber für Kundenzufriedenheit")
+            st.header("Wichtigste Treiber für Kundenzufriedenheit")
             st.info("Zusammengefasste Sicht basierend auf dem LightGBM-Modell.")
             
             if models and models.get("lgbm"):
@@ -296,7 +296,7 @@ with tab_insights:
                         model_name_for_llm_explanation = "dem LightGBM Modell" # Angepasster Name für den Prompt
 
                         st.markdown("---")
-                        st.subheader("🤖 KI-basierte Zusammenfassung der Treiber")
+                        st.subheader("KI-basierte Zusammenfassung der Treiber")
                         if st.button("Diagramm-Erklärung generieren", key="explain_global_drivers_mgmt_btn"):
                             if current_top_importance_data_for_llm is not None and not current_top_importance_data_for_llm.empty:
                                 with st.spinner("Erkläre Diagramm der wichtigsten Treiber..."):
@@ -341,7 +341,7 @@ with tab_insights:
                 st.warning("LightGBM-Modell nicht geladen.")
         
         elif st.session_state.view_mode == "Data Analyst":
-            st.header("🎯 Globale Feature Importances")
+            st.header("Globale Feature Importances")
             if models: 
                 models_to_display_da = { # Eigener Name für DA, um Verwechslung zu vermeiden
                     "XGBoost": (models.get("xgb"), cm.viridis),
@@ -381,7 +381,7 @@ with tab_insights:
 
 
     with sub_tab1_segments:
-        header_seg = "🔍 Kundengruppen-Analyse" if st.session_state.view_mode == "Management" else "🔍 Segmente (SHAP-Analyse)"
+        header_seg = "🔍 Kundengruppen-Analyse" if st.session_state.view_mode == "Management" else "Segmente (SHAP-Analyse)"
         st.header(header_seg)
         
         write_seg_intro_mgmt = """Diese Analyse zeigt, welche Faktoren die Zufriedenheit für spezifische Kundengruppen am stärksten beeinflussen.
@@ -390,7 +390,7 @@ with tab_insights:
         Nutzen Sie die Filter unten, um ein bestimmtes Segment zu definieren."""
         st.write(write_seg_intro_mgmt if st.session_state.view_mode == "Management" else write_seg_intro_da)
         
-        st.subheader("🎯 Filter für Kundengruppen-Analyse") 
+        st.subheader("Filter für Kundengruppen-Analyse") 
         filter_col1, filter_col2 = st.columns(2)
         with filter_col1:
             segment_class = st.selectbox("Flugklasse", ["Alle", "Economy", "Economy Plus", "Business"], key="filter_class_seg_common")
@@ -406,7 +406,7 @@ with tab_insights:
             segment_distance_range = st.slider("Flugdistanz (km)", min_value=dist_min, max_value=dist_max, value=(dist_min, dist_max) if dist_min < dist_max else (dist_min, dist_min +1 if dist_min < 10000 else dist_min), key="filter_distance_seg_common")
 
         st.markdown("---") 
-        st.subheader("🤖 KI-basierte Handlungsempfehlungen")
+        st.subheader("KI-basierte Handlungsempfehlungen")
         
         # Diese Variable wird später im Code gefüllt, wenn num_samples > 0
         influence_df_for_llm = pd.DataFrame() # Initialisieren als leeres DataFrame
@@ -507,7 +507,7 @@ with tab_insights:
 
 
     with sub_tab1_bcg:
-        st.header("💡 Prioritätsmatrix") 
+        st.header("Prioritätsmatrix") 
         # ... (BCG Matrix Code bleibt unverändert wie in deinem letzten Code-Block) ...
         service_features = [
             "Seat Comfort", "Cleanliness", "Food and Drink", "In-flight Wifi Service",
@@ -640,7 +640,7 @@ if st.session_state.view_mode == "Data Analyst" and tab_upload is not None:
 
 # Tab 3: Manueller Input & Erklärung
 with tab_manual:
-    header_manual = "✍️ Einzelbeispiel-Analyse" if st.session_state.view_mode == "Management" else "✍️ Manueller Input & Erklärung"
+    header_manual = "Einzelbeispiel-Analyse" if st.session_state.view_mode == "Management" else "Manueller Input & Erklärung"
     st.header(header_manual)
 
     # ... (Manuelle Eingabe Widgets bleiben gleich) ...
@@ -657,7 +657,7 @@ with tab_manual:
         col1, col2 = st.columns(2)
         values_input = {} 
         with col1:
-            st.subheader("📋 Grunddaten des Fluggastes")
+            st.subheader("Grunddaten des Fluggastes")
             values_input['Age'] = st.slider("Alter", 18, 80, 35, key="manual_age_slider_cmn_key")
             values_input['Flight Distance'] = st.slider("Flugdistanz (km)", 100, 5000, 1000, key="manual_flightdist_slider_cmn_key")
             values_input['Gender_Male'] = 1 if st.selectbox("Geschlecht", ["Männlich", "Weiblich"], key="manual_gender_select_cmn_key") == "Männlich" else 0
@@ -668,7 +668,7 @@ with tab_manual:
             values_input['Class_Economy Plus'] = 1 if klasse == "Economy Plus" else 0
             values_input['Delay'] = st.slider("Verspätung (Minuten)", 0, 300, 10, key="manual_delay_slider_cmn_key")
         with col2:
-            st.subheader("⭐ Servicebewertungen (1=schlecht, 5=exzellent)")
+            st.subheader("Servicebewertungen (1=schlecht, 5=exzellent)")
             for feat_key, display_name, default_val in service_features_config:
                 values_input[feat_key] = st.slider(display_name, 1, 5, default_val, key=f"manual_slider_{feat_key.replace(' ', '_')}_cmn_key")
         return pd.DataFrame([values_input])[feature_order]
@@ -700,7 +700,7 @@ with tab_manual:
         # --- Reihenfolge für Management Ansicht ---
         if st.session_state.view_mode == "Management":
             st.markdown("---")
-            st.markdown(f"### 📊 Gesamtbewertung") 
+            st.markdown(f"### Gesamtbewertung") 
             st.markdown(f"**Durchschnittliche Zufriedenheitswahrscheinlichkeit: {avg_prob_manual:.2%}**") 
             if avg_prob_manual >= 0.7: st.success("✅ Dieser Fluggasttyp wird höchstwahrscheinlich sehr zufrieden sein!")
             elif avg_prob_manual >= 0.5: st.success("✅ Dieser Fluggasttyp wird wahrscheinlich zufrieden sein.")
@@ -708,7 +708,7 @@ with tab_manual:
             else: st.error("❌ Dieser Fluggasttyp wird wahrscheinlich unzufrieden sein. Massnahmen prüfen!") 
             
             st.markdown("---")
-            st.subheader("💡 KI-basierte Empfehlungen") 
+            st.subheader("KI-basierte Empfehlungen") 
             if st.button("Empfehlungen generieren", key="generate_manual_recommendations_mgmt_btn_key"): # Eindeutiger Key
                 relevant_features_for_llm = {k: v for k, v in input_df_manual.iloc[0].to_dict().items() if k in feature_order}
                 with st.spinner("Generiere Empfehlungen..."):
@@ -726,7 +726,7 @@ with tab_manual:
         # --- Reihenfolge für Data Analyst Ansicht ---
         elif st.session_state.view_mode == "Data Analyst":
             st.markdown("---") 
-            st.markdown(f"### 📊 Gesamtbewertung") 
+            st.markdown(f"### Gesamtbewertung") 
             st.markdown(f"**Durchschnittliche Zufriedenheitswahrscheinlichkeit (aller Modelle): {avg_prob_manual:.2%}**")
             if avg_prob_manual >= 0.7: st.success("✅ Der Kunde wird höchstwahrscheinlich sehr zufrieden sein!")
             elif avg_prob_manual >= 0.5: st.success("✅ Der Kunde wird wahrscheinlich zufrieden sein.")
@@ -734,7 +734,7 @@ with tab_manual:
             else: st.error("❌ Der Kunde wird wahrscheinlich unzufrieden sein. Massnahmen sollten ergriffen werden!")
 
             st.markdown("---")
-            st.subheader("💡 KI-basierte Empfehlungen") 
+            st.subheader("KI-basierte Empfehlungen") 
             if st.button("Empfehlungen für diesen Kunden generieren", key="generate_manual_input_recommendations_da_btn_key"): # Eindeutiger Key
                 relevant_features_for_llm = {k: v for k, v in input_df_manual.iloc[0].to_dict().items() if k in feature_order}
                 with st.spinner("Generiere Empfehlungen basierend auf deinen Eingaben..."):
@@ -769,7 +769,7 @@ with tab_manual:
             
     
             st.markdown("---") 
-            st.markdown("### 🚀 Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit") 
+            st.markdown("### Visuelle Darstellung der Zufriedenheitswahrscheinlichkeit") 
             rocket_cols_display = st.columns(len(predictions_manual) if predictions_manual else 1) 
             idx = 0
             for model_key_iter, result in predictions_manual.items(): 
