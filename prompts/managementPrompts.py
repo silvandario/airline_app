@@ -10,7 +10,6 @@ top_features = [
     "Flight Distance: 0.03",
     "On-board Service: 0.03"
 ]
-
 prompt_KIBasierteEmpfehlungen_Management = "Die folgenden Merkmale haben sich im Modell als besonders wichtig für die Vorhersage der Zufriedenheit herausgestellt:\n"
 prompt_KIBasierteEmpfehlungen_Management += "\n".join([f"- {feat}" for feat in top_features])
 prompt_KIBasierteEmpfehlungen_Management += "\nBitte berücksichtige diese bei deinen Empfehlungen besonders – negative Bewertungen bei diesen Aspekten haben überdurchschnittlich grossen Einfluss. Alle anderen Features kommen danach von der Wichtigkeit her gesehen."
@@ -23,3 +22,9 @@ um die Zufriedenheit speziell dieser Kundengruppe zu verbessern.
 Fokussiere auf die kritischsten Punkte (starker negativer Einfluss) und die grösste Chancen (starker positiver Einfluss).
 Denk daran, dass die Zielgruppe Manger sind und somit wenig technisches Know How mitbringen.
 """
+
+prompt_Handlungsempfehlungen_Management="""
+    Bitte fasse die Kernaussage dieses Diagramms in 3-5 prägnanten Sätzen zusammen. 
+    Welche 1-2 wichtigsten Schlussfolgerungen sollte das Management hieraus ziehen?
+    Die Erklärung ist für eine Management-Ebene gedacht und sollte entsprechend formuliert sein (klar, handlungsorientiert, ohne tiefgehende technische Details).
+    """

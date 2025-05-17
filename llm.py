@@ -3,6 +3,7 @@
 from openai import OpenAI
 import streamlit as st
 import pandas as pd
+from prompts.managementPrompts import prompt_Handlungsempfehlungen_Management
 
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -159,12 +160,10 @@ Top Treiber (absteigende Wichtigkeit):
         feature_list_str += f"- {feature.replace('_', ' ')} (Relative Wichtigkeit: {importance_val:.2%})\n"
 
     prompt = prompt_intro + feature_list_str
-
-    prompt += """
-Bitte fasse die Kernaussage dieses Diagramms in 3-5 prägnanten Sätzen zusammen. 
-Welche 1-2 wichtigsten Schlussfolgerungen sollte das Management hieraus ziehen?
-Die Erklärung ist für eine Management-Ebene gedacht und sollte entsprechend formuliert sein (klar, handlungsorientiert, ohne tiefgehende technische Details).
-"""
+    if view_mode == "Management":
+        prompt += prompt_Handlungsempfehlungen_Management
+    else: 
+        prompt += prompt_Handlungsempfehlungen_Management
     messages = [
         {"role": "system", "content": "Du bist ein Kommunikationsexperte, der Datenvisualisierungen für Führungskräfte interpretiert."},
         {"role": "user", "content": prompt}
