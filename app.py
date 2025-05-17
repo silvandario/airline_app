@@ -10,8 +10,10 @@ import seaborn as sns
 import lightgbm as lgb 
 import shap
 import os
+import plotly.express as px #für bessere Visualisierungen
 from prompts.managementPrompts import prompt_KIBasierteEmpfehlungen_Management, prompt_SHAP_Management
 from prompts.analystPrompts import prompt_SHAP_Analyst
+
 
 
 # Seiteneinrichtung
@@ -202,7 +204,23 @@ else:  # Management-Modus
         .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] { color: initial; border-bottom-color: initial; }
         .stDataFrame th, .stTable th { color: initial; background-color: initial;}
         .stDataFrame td, .stTable td { color: initial; }
+        /* --- CSS für Button mit Umrandung im Management Modus --- */
+        .stButton > button {
+            border: 1px solid grey; /* Eine dünne graue Umrandung */
+            background-color: white; /* Optional: Weiss Hintergrund, wenn nicht transparent gewünscht */
+            color: black; /* Optional: Schwarzer Text */
+            /* Sie können Farbe und Dicke der Umrandung anpassen */
+            /* z.B. border: 2px solid #4F8BF9; */
+        }
+        .stButton > button:hover {
+            border-color: darkgrey; /* Farbe der Umrandung beim Hover */
+            color: #333; /* Textfarbe beim Hover */
+            background-color: #f0f0f0; /* Leichter Hintergrund beim Hover */
+        }
+        /* ---------------------------------------------------------- */
         </style>
+
+        
         """, unsafe_allow_html=True)
 
     if os.path.exists("assets/background.jpg"):
@@ -294,7 +312,40 @@ with tab_insights:
                         current_top_n_global = min(num_features_to_display, len(importance))
                         current_top_importance_data_for_llm = importance.iloc[:current_top_n_global] 
                         model_name_for_llm_explanation = "dem LightGBM Modell" # Angepasster Name für den Prompt
+                        
+                        color_palette_lgbm = cm.coolwarm 
+                        if (importance.max() - importance.min()) == 0: norm_values = pd.Series(0.5, index=importance.index) 
+                        else: norm_values = (importance - importance.min()) / (importance.max() - importance.min())
+                        colors = [color_palette_lgbm(val) for val in norm_values]
+                        if not importance.empty:
+                            current_top_n_global = min(num_features_to_display, len(importance))
+                            # Daten für Plotly vorbereiten
+                            top_importance_plot_mgmt = importance.iloc[:current_top_n_global].reset_index()
+                            top_importance_plot_mgmt.columns = ['Feature', 'Relative Wichtigkeit'] # Spalten benennen
 
+                            # Plotly Express Bar Chart erstellen
+                            fig = px.bar(
+                                top_importance_plot_mgmt,
+                                y='Feature',         # Features auf der Y-Achse
+                                x='Relative Wichtigkeit', # Wichtigkeit auf der X-Achse
+                                orientation='h',      # Horizontales Balkendiagramm
+                                title=f"Top {current_top_n_global} Treiber für Kundenzufriedenheit (LightGBM)", # Titel
+                                labels={'Relative Wichtigkeit': 'Relative Wichtigkeit (%)'}, # Achsenbeschriftung anpassen
+                                text='Relative Wichtigkeit' # Werte auf den Balken anzeigen
+                            )
+
+                            # Layout anpassen für bessere Lesbarkeit und Prozentformat
+                            fig.update_layout(
+                                yaxis={'categoryorder':'total ascending'}, # Nach Wert sortieren
+                                xaxis_tickformat=".1%", # X-Achse als Prozent formatieren
+                                hovermode="y unified" # Tooltip beim Hover über die Y-Achse anzeigen
+                            )
+
+                            # Textformatierung auf den Balken (optional, kann angepasst werden)
+                            fig.update_traces(texttemplate='%{text:.1%}', textposition='outside')
+
+                            # Diagramm in Streamlit anzeigen
+                            st.plotly_chart(fig, use_container_width=True) # use_container_width passt die Breite an
                         st.markdown("---")
                         st.subheader("KI-basierte Zusammenfassung der Treiber")
                         if st.button("Diagramm-Erklärung generieren", key="explain_global_drivers_mgmt_btn"):
@@ -313,26 +364,7 @@ with tab_insights:
                                         st.exception(e)
                             else:
                                 st.warning("Keine Daten für die Erklärung verfügbar.")
-                        st.markdown("---") 
-                        
-                        color_palette_lgbm = cm.coolwarm 
-                        if (importance.max() - importance.min()) == 0: norm_values = pd.Series(0.5, index=importance.index) 
-                        else: norm_values = (importance - importance.min()) / (importance.max() - importance.min())
-                        colors = [color_palette_lgbm(val) for val in norm_values]
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        
-                        top_importance_plot_mgmt = importance.iloc[:current_top_n_global]
-                        top_colors_plot_mgmt = colors[:current_top_n_global]
-                        y_pos_mgmt = range(len(top_importance_plot_mgmt))
 
-                        ax.barh(y_pos_mgmt, top_importance_plot_mgmt.values, color=top_colors_plot_mgmt)
-                        ax.set_yticks(y_pos_mgmt); ax.set_yticklabels(top_importance_plot_mgmt.index)
-                        ax.set_title(f"Top {current_top_n_global} Treiber") 
-                        ax.set_xlabel("Relative Wichtigkeit")
-                        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.1%}'.format(x)))
-                        if not top_importance_plot_mgmt.empty: ax.set_xlim(0, top_importance_plot_mgmt.iloc[0] * 1.1 if top_importance_plot_mgmt.iloc[0] > 0 else 0.1)
-                        else: ax.set_xlim(0, 0.1) 
-                        plt.tight_layout(); st.pyplot(fig); plt.close(fig)
                     else: 
                         st.write("Keine Feature Importances für LightGBM zu visualisieren.")
                 else:
@@ -381,7 +413,7 @@ with tab_insights:
 
 
     with sub_tab1_segments:
-        header_seg = "🔍 Kundengruppen-Analyse" if st.session_state.view_mode == "Management" else "Segmente (SHAP-Analyse)"
+        header_seg = "Kundengruppen-Analyse" if st.session_state.view_mode == "Management" else "Segmente (SHAP-Analyse)"
         st.header(header_seg)
         
         write_seg_intro_mgmt = """Diese Analyse zeigt, welche Faktoren die Zufriedenheit für spezifische Kundengruppen am stärksten beeinflussen.
@@ -469,27 +501,56 @@ with tab_insights:
 
                 if st.session_state.view_mode == "Management":
                     st.subheader(f"Top {current_top_n_shap} Einflussfaktoren")
-                    simplified_influence_df = influence_df_for_llm[['Feature', 'Tendenz']]
+                    simplified_influence_df = influence_df_for_llm[['Feature','Einfluss-Stärke', 'Tendenz']]
+                    with st.expander("Interpreationshilfe", expanded=True):
+                        st.markdown(
+                            """
+                            * Eine **positive Tendenz ✅** bedeutet: Dieser Faktor hat die Zufriedenheit in dieser Gruppe im Durchschnitt **positiv** beeinflusst (ist also ein pluspunkt).
+                            * Eine **negative Tendenz ❌** bedeutet: Dieser Faktor hat im Durchschnitt zur **Unzufriedenheit** in dieser Gruppe **geführt**. Bei Faktoren mit negativer Tendenz sollten daher sind hier **gezielte Massnahmen** wichtig**.
+                            * Die **Einfluss-Stärke** zeigt, wie bedeutend der Faktor für diese Gruppe ist (ein höherer Wert bedeutet einen grösseren Hebel).
+
+                            Diese Analyse ermöglicht es Ihnen, Massnahmen und Marketing gezielt auf die Bedürfnisse und Erfahrungen Ihrer wichtigsten Kundensegmente auszurichten.
+                            """
+                        )
                     st.dataframe(simplified_influence_df)
                     st.subheader("Haupteinflussfaktoren auf Zufriedenheit")
                 else: 
                     st.subheader(f"Top {current_top_n_shap} Einflussfaktoren (SHAP)")
                     st.dataframe(influence_df_for_llm.style.format({"Einfluss-Stärke": "{:.2f}"}))
                     st.subheader("SHAP Summary Plot (Bar)")
-
-                fig_bar_shap, ax_bar_shap = plt.subplots(figsize=(10, max(6, current_top_n_shap * 0.5)))
-                # ... (Rest des Bar Plot Codes bleibt gleich) ...
-                sorted_idx = mean_abs_shap.index[:current_top_n_shap][::-1]
-                bar_colors = ['green' if mean_shap_for_tendency[feat] > 0 else ('red' if mean_shap_for_tendency[feat] < 0 else 'grey') for feat in sorted_idx]
-                ax_bar_shap.barh(range(len(sorted_idx)), mean_abs_shap[sorted_idx].values, color=bar_colors)
-                ax_bar_shap.set_yticks(range(len(sorted_idx))); ax_bar_shap.set_yticklabels(sorted_idx)
-                ax_bar_shap.set_xlabel("Mittlerer absoluter Einflusswert" if st.session_state.view_mode == "Management" else "Mittlerer absoluter SHAP-Wert")
-                plot_title = "Einfluss der Faktoren auf Zufriedenheit" if st.session_state.view_mode == "Management" else "Einfluss der Features auf Zufriedenheit (SHAP)"
-                ax_bar_shap.set_title(plot_title)
-                from matplotlib.patches import Patch
-                legend_elements = [ Patch(facecolor='green', label='Positiver Einfluss'), Patch(facecolor='red', label='Negativer Einfluss'), Patch(facecolor='grey', label='Neutraler Einfluss')]
-                ax_bar_shap.legend(handles=legend_elements); plt.tight_layout(); st.pyplot(fig_bar_shap); plt.close(fig_bar_shap)
-
+                # Farben für die Tendenz
+                # Define custom color map for Tendenz
+                tendency_color_map = {
+                     'Positiv ✅': 'green',
+                     'Negativ ❌': 'red',
+                     'Neutral ➖': 'grey'
+                 }
+                # Bar Plot für SHAP-Werte
+                fig_bar_shap = px.bar(
+                     influence_df_for_llm, # Use the DataFrame containing Tendenz and Einfluss-Stärke
+                     y='Feature',
+                     x='Einfluss-Stärke', # Use Einfluss-Stärke for the bar length
+                     orientation='h',
+                     color='Tendenz', # Color based on Tendenz
+                     color_discrete_map=tendency_color_map, # Apply custom colors
+                     title="", # Plot title (leer lassen, da wir st.subheader haben)
+                     labels={'Einfluss-Stärke': 'Mittlerer absoluter Einflusswert'}, # X-axis label
+                     hover_data={'Einfluss-Stärke': ':.2f', 'Tendenz': True, 'Feature': False} # Customize hover info
+                 )
+                # Chart zeigen
+                fig_bar_shap.update_layout(
+                     yaxis={'categoryorder':'total ascending'}, # Order bars by value
+                     showlegend=True # Show the legend for Tendenz colors
+                 )
+                st.plotly_chart(fig_bar_shap, use_container_width=True)
+                with st.expander("Methoden und Interpretation der Analyse"):
+                    st.markdown(
+                        """
+                        * Diese Analyse basiert auf einer fortschrittlichen Methode namens **SHAP (SHapley Additive exPlanations)**, die es ermöglicht, den Einfluss einzelner Merkmale auf die Vorhersage eines Modells zu quantifizieren.
+                        * SHAP nutzt spieltheoretische Konzepte, um den Einfluss jedes Merkmals auf die Vohersage (bei uns Kundenzufriedenheit) zu bestimmen. 
+                        * Man sollte sich vor allem auf die Features konzentrieren, die eine negative Tendenz aufweisen und eine starke Einflussgrösse haben, weil sie in dieser Gruppe zu Unzufriedenheit geführt haben.
+                    """
+                    )
 
                 if st.session_state.view_mode == "Data Analyst":
                     if st.checkbox("Zeige SHAP Beeswarm Plot", key="beeswarm_checkbox_da_seg_unique"):
@@ -502,13 +563,23 @@ with tab_insights:
                         fig_beeswarm, ax_beeswarm = plt.subplots()
                         shap.summary_plot(shap_values_for_plot, feature_values_for_plot, max_display=current_top_n_shap,show=False, plot_size=(10, max(8, current_top_n_shap * 0.6)))
                         plt.tight_layout(); st.pyplot(fig_beeswarm); plt.close(fig_beeswarm)
+
             else:
                 st.warning("Keine Daten für die ausgewählte Kundengruppe. Filter anpassen.")
 
 
     with sub_tab1_bcg:
         st.header("Prioritätsmatrix") 
-        # ... (BCG Matrix Code bleibt unverändert wie in deinem letzten Code-Block) ...
+        with st.expander("Was ist diese Matrix?"):
+            st.markdown(
+                """
+                Diese Prioritätsmatrix hilft Ihnen, jene Servicefaktoren zu identifizieren, 
+                die einen **wichtigen Einfluss** auf die Kundenzufriedenheit haben (Ihre 'Hebel'), 
+                aber aktuell **schlecht bewertet** werden. 
+                Die Fokussierung auf diese Bereiche ermöglicht es, die Kundenzufriedenheit schnell und effektiv zu steigern.
+                """,
+                unsafe_allow_html=True
+            )
         service_features = [
             "Seat Comfort", "Cleanliness", "Food and Drink", "In-flight Wifi Service",
             "In-flight Entertainment", "Baggage Handling", "On-board Service", 
@@ -548,29 +619,132 @@ with tab_insights:
                         "Wichtigkeit (SHAP)": shap_means[common_features],
                         "Bewertung (1-5)": mean_ratings[common_features]
                     }) # Index ist bereits Feature
+
                     if not matrix_df.empty:
                         x_median = matrix_df["Bewertung (1-5)"].median()
                         y_median = matrix_df["Wichtigkeit (SHAP)"].median()
-                        fig_bcg, ax_bcg = plt.subplots(figsize=(12, 10))
-                        colors_quad = []
-                        for feature_name_loop, row_data in matrix_df.iterrows(): 
-                            if row_data["Wichtigkeit (SHAP)"] >= y_median and row_data["Bewertung (1-5)"] < x_median: colors_quad.append('red')
-                            elif row_data["Wichtigkeit (SHAP)"] >= y_median and row_data["Bewertung (1-5)"] >= x_median: colors_quad.append('green')
-                            elif row_data["Wichtigkeit (SHAP)"] < y_median and row_data["Bewertung (1-5)"] < x_median: colors_quad.append('orange')
-                            else: colors_quad.append('blue')
-                        ax_bcg.scatter(matrix_df["Bewertung (1-5)"], matrix_df["Wichtigkeit (SHAP)"], s=250, alpha=0.7, c=colors_quad, edgecolors="black")
-                        for feature_name_loop, row_data in matrix_df.iterrows(): 
-                            ax_bcg.text(row_data["Bewertung (1-5)"] + 0.03, row_data["Wichtigkeit (SHAP)"], feature_name_loop, fontsize=9)
-                        ax_bcg.axvline(x=x_median, color="gray", linestyle="--", lw=1); ax_bcg.axhline(y=y_median, color="gray", linestyle="--", lw=1)
-                        ax_bcg.set_xlabel("Durchschnittliche Bewertung (1 = schlecht, 5 = sehr gut)"); ax_bcg.set_ylabel("Wichtigkeit (mittlerer SHAP-Wert)")
-                        ax_bcg.set_title("Prioritätsmatrix: Servicequalität vs. Einfluss auf Zufriedenheit")
-                        if not matrix_df.empty: 
-                            ax_bcg.set_xlim(2.5, 4.0) # X-Achse von 2.5 bis 4.0
-                            ax_bcg.set_ylim(matrix_df["Wichtigkeit (SHAP)"].min() - (matrix_df["Wichtigkeit (SHAP)"].max()*0.05 if matrix_df["Wichtigkeit (SHAP)"].max() > 0 else 0.1 ), 
-                                            matrix_df["Wichtigkeit (SHAP)"].max() * 1.05 if matrix_df["Wichtigkeit (SHAP)"].max() > 0 else 0.5)
-                        plt.tight_layout(); st.pyplot(fig_bcg); plt.close(fig_bcg)
-                        st.markdown("""**Interpretation:**\n- Oben links (Rot): 🔥 Sofortige Aufmerksamkeit & Investition (Wichtig & Schlecht)\n- Oben rechts (Grün): ✅ Stärken beibehalten (Wichtig & Gut)\n- Unten links (Orange): 🤔 Beobachten, geringe Priorität (Unwichtig & Schlecht)\n- Unten rechts (Blau): 💤 Kein akuter Handlungsbedarf (Unwichtig & Gut)""")
-                    else: st.warning("Matrix ist leer nach Datenaufbereitung.")
+
+                        # Quadranten-Kategorien zum DataFrame hinzufügen (MANAGER-BEGRIFFE)
+                        def get_quadrant(row):
+                            if row["Wichtigkeit (SHAP)"] >= y_median and row["Bewertung (1-5)"] < x_median:
+                                return "Fokus: Handlungsbedarf" # Rot
+                            elif row["Wichtigkeit (SHAP)"] >= y_median and row["Bewertung (1-5)"] >= x_median:
+                                return "Stärken: Sichern" # Grün
+                            elif row["Wichtigkeit (SHAP)"] < y_median and row["Bewertung (1-5)"] < x_median:
+                                return "Geringe Priorität" # Orange
+                            else:
+                                return "Standard halten" # Blau
+
+                        matrix_df['Quadrant'] = matrix_df.apply(get_quadrant, axis=1)
+                        matrix_df['Feature'] = matrix_df.index # Feature-Namen als Spalte für Plotly Text/Tooltip
+
+                        # Plotly Express Scatter Plot erstellen
+                        fig_bcg = px.scatter(
+                            matrix_df,
+                            x="Bewertung (1-5)",
+                            y="Wichtigkeit (SHAP)",
+                            text="Feature", # Feature-Namen als Text neben den Punkten
+                            color="Quadrant", # Punkte nach Quadrant einfärben
+                            size_max=30, # Maximale Punktgrösse
+                            hover_name="Feature", # Feature-Name im Tooltip fett hervorheben
+                            hover_data={ # Zusätzliche Daten im Tooltip anzeigen
+                                "Bewertung (1-5)": ':.2f',
+                                "Wichtigkeit (SHAP)": ':.2f',
+                                "Quadrant": False,
+                                "Feature": False
+                            },
+                            title="Prioritätsmatrix: Strategische Prioritäten zur Steigerung der Kundenzufriedenheit"
+                        )
+
+                        # Achsenbereiche festlegen
+                        x_axis_range = [2.5, 4.0]
+                        y_min_plotly = matrix_df["Wichtigkeit (SHAP)"].min() - (matrix_df["Wichtigkeit (SHAP)"].max()*0.05 if matrix_df["Wichtigkeit (SHAP)"].max() > 0 else 0.1)
+                        y_max_plotly = matrix_df["Wichtigkeit (SHAP)"].max() * 1.05 if matrix_df["Wichtigkeit (SHAP)"].max() > 0 else 0.5
+                        y_axis_range = [y_min_plotly, y_max_plotly]
+
+
+                        # Layout anpassen, Achsenbereiche setzen und Legendenposition anpassen
+                        fig_bcg.update_layout(
+                            xaxis_title="Durchschnittliche Bewertung (1 = schlecht, 5 = sehr gut)",
+                            yaxis_title="Wichtigkeit ★",
+                            hovermode='closest',
+                            xaxis=dict(range=x_axis_range),
+                            yaxis=dict(range=y_axis_range),
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="top",
+                                y=-0.2,
+                                xanchor="center",
+                                x=0.5
+                            ),
+                            margin=dict(b=100) # Rand unten für Legende
+                        )
+
+                        # Text-Labels der Datenpunkte anpassen (Position und Größe)
+                        fig_bcg.update_traces(
+                            textposition='top center', # Position des Textes relativ zum Punkt
+                            textfont=dict(size=9)     # Schriftgrösse anpassen
+                        )
+
+                        # Farben für die Quadranten festlegen (KEYS AN NEUE BEGRIFFE ANPASSEN)
+                        quadrant_colors = {
+                            "Fokus: Handlungsbedarf": 'red',
+                            "Stärken: Sichern": 'green',
+                            "Geringe Priorität": 'orange',
+                            "Standard halten": 'blue'
+                        }
+                        fig_bcg.for_each_trace(lambda t: t.update(marker_color=quadrant_colors[t.name]))
+
+
+                        # Hintergrund-Rechtecke für die Quadranten hinzufügen
+                        fig_bcg.add_shape(type="rect",
+                                        x0=x_axis_range[0], y0=y_median, x1=x_median, y1=y_axis_range[1], # Oben Links
+                                        line=dict(color="gray", width=0), fillcolor="red", opacity=0.1, layer="below")
+                        fig_bcg.add_shape(type="rect",
+                                        x0=x_median, y0=y_median, x1=x_axis_range[1], y1=y_axis_range[1], # Oben Rechts
+                                        line=dict(color="gray", width=0), fillcolor="green", opacity=0.1, layer="below")
+                        fig_bcg.add_shape(type="rect",
+                                        x0=x_axis_range[0], y0=y_axis_range[0], x1=x_median, y1=y_median, # Unten Links
+                                        line=dict(color="gray", width=0), fillcolor="orange", opacity=0.1, layer="below")
+                        fig_bcg.add_shape(type="rect",
+                                        x0=x_median, y0=y_axis_range[0], x1=x_axis_range[1], y1=y_median, # Unten Rechts
+                                        line=dict(color="gray", width=0), fillcolor="blue", opacity=0.1, layer="below")
+
+                        # Medianlinien hinzufügen
+                        fig_bcg.add_vline(x=x_median, line=dict(color="gray", width=1, dash="dash"))
+                        fig_bcg.add_hline(y=y_median, line=dict(color="gray", width=1, dash="dash"))
+
+                        # Text-Annotationen für die Quadranten hinzufügen (NEUE MANAGER-BEGRIFFE)
+                        fig_bcg.add_annotation(x=(x_axis_range[0] + x_median) / 2, y=(y_median + y_axis_range[1]) / 2,
+                                            text="Fokus:<br>Handlungsbedarf", showarrow=False, xanchor="center", yanchor="middle",
+                                            font=dict(size=10, color="red"), opacity=0.8, align="center") # align="center" für Zeilenumbruch
+                        fig_bcg.add_annotation(x=(x_median + x_axis_range[1]) / 2, y=(y_median + y_axis_range[1]) / 2,
+                                            text="Stärken:<br>Sichern", showarrow=False, xanchor="center", yanchor="middle",
+                                            font=dict(size=10, color="green"), opacity=0.8, align="center")
+                        fig_bcg.add_annotation(x=(x_axis_range[0] + x_median) / 2, y=(y_axis_range[0] + y_median) / 2,
+                                            text="Geringe Priorität", showarrow=False, xanchor="center", yanchor="middle",
+                                            font=dict(size=10, color="orange"), opacity=0.8)
+                        fig_bcg.add_annotation(x=(x_median + x_axis_range[1]) / 2, y=(y_axis_range[0] + y_median) / 2,
+                                            text="Standard halten", showarrow=False, xanchor="center", yanchor="middle",
+                                            font=dict(size=10, color="blue"), opacity=0.8)
+
+                        # Diagramm in Streamlit anzeigen und Grösse anpassen
+                        st.plotly_chart(fig_bcg, use_container_width=True, height=600)
+
+                        st.markdown(
+        """
+        <div style="font-size: small; color: grey; margin-top: 30px;"> 
+        <b>Was bedeutet hier "Wichitgkeit" (★)?</b><br>
+        
+        Dieser Wert zeigt uns, **wie stark eine Änderung bei diesem Faktor die Kundenzufriedenheit voraussichtlich beeinflusst**.<br>
+        Ein Faktor mit hohem Einfluss (weit oben) hat einen **grossen Hebel**: Eine Verbesserung hier hat wahrscheinlich einen grossen Effekt auf die gesamte Kundenzufriedenheit.<br>
+        Ein Faktor mit geringem Einfluss (weit unten) hat einen kleineren Hebel.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
                 else: st.warning("Keine gemeinsamen Features für SHAP und Bewertungen gefunden.")
             else: st.warning("SHAP-Mittelwerte oder mittlere Bewertungen konnten nicht für alle Service-Features berechnet werden.")
         else: st.warning("Nicht genügend Daten für die Matrix verfügbar.")
