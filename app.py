@@ -10,7 +10,7 @@ import seaborn as sns
 import lightgbm as lgb 
 import shap
 import os
-from prompts.promptKIBasierteEmpfehlungenManagement import prompt_KIBasierteEmpfehlungen_Management
+from prompts.managementPrompts import prompt_KIBasierteEmpfehlungen_Management
 
 
 # Seiteneinrichtung
